@@ -70,23 +70,28 @@ export default function VouchersTab() {
         >
           All
         </button>
-        {filterChips.map((chip) => (
-          <button
-            key={chip}
-            onClick={() => {
-              setActiveChip(chip)
-              if (chip !== 'Status') setStatusFilter('all')
-              setPage(1)
-            }}
-            className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-              activeChip === chip
-                ? 'bg-[#1565C0] text-white border-[#1565C0]'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {chip}
-          </button>
-        ))}
+        {filterChips.map((chip) => {
+          const isActive = chip === 'Status'
+          return (
+            <button
+              key={chip}
+              disabled={!isActive}
+              onClick={() => {
+                setActiveChip(chip)
+                setPage(1)
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                !isActive
+                  ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : activeChip === chip
+                    ? 'bg-[#1565C0] text-white border-[#1565C0]'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {chip}
+            </button>
+          )
+        })}
 
         {/* Status sub-filter, shown only when Status chip is active */}
         {activeChip === 'Status' && (
@@ -168,8 +173,9 @@ export default function VouchersTab() {
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              {(page - 1) * perPage + 1}–{Math.min(page * perPage, filtered.length)} of{' '}
-              {filtered.length}
+              {filtered.length === 0
+                ? '0–0 of 0'
+                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, filtered.length)} of ${filtered.length}`}
             </span>
             <Button
               variant="outline"

@@ -14,8 +14,11 @@ export default function CreateVouchersTab() {
             Upload a CSV file to create multiple vouchers at once
           </p>
         </div>
-        <Button className="bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2">
-          Choose File to Upload
+        <Button asChild className="bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2">
+          <label>
+            Choose File to Upload
+            <input type="file" accept=".csv,text/csv" className="hidden" />
+          </label>
         </Button>
       </div>
     </div>
