@@ -6,8 +6,13 @@ const statusStyles: Record<string, string> = {
   Rejected: 'bg-red-100 text-red-700',
   Pending: 'bg-yellow-100 text-yellow-700',
   Failed: 'bg-red-100 text-red-700',
-  Active: 'bg-purple-100 text-purple-700',
+  // Voucher statuses
+  Active: 'bg-green-100 text-green-700',
   Inactive: 'bg-gray-100 text-gray-500',
+  Canceled: 'bg-red-100 text-red-700',
+  Expired: 'bg-purple-100 text-purple-700',
+  Utilized: 'bg-gray-200 text-[#374151]',
+  Suspended: 'bg-orange-100 text-orange-700',
 }
 
 export default function StatusBadge({ status }: { status: string }) {
