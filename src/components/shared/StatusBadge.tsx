@@ -8,14 +8,21 @@ const statusStyles: Record<string, string> = {
   Failed: 'bg-red-100 text-red-700',
   // Voucher statuses
   Active: 'bg-green-100 text-green-700',
-  Inactive: 'bg-gray-100 text-gray-500',
+  Inactive: 'bg-gray-100 text-gray-600',
+  'Inactive-G2P': 'bg-red-100 text-red-700',
   Canceled: 'bg-red-100 text-red-700',
   Expired: 'bg-purple-100 text-purple-700',
   Utilized: 'bg-gray-200 text-[#374151]',
   Suspended: 'bg-orange-100 text-orange-700',
 }
 
-export default function StatusBadge({ status }: { status: string }) {
+export default function StatusBadge({
+  status,
+  label,
+}: {
+  status: string
+  label?: string
+}) {
   return (
     <span
       className={cn(
@@ -23,7 +30,7 @@ export default function StatusBadge({ status }: { status: string }) {
         statusStyles[status] ?? 'bg-gray-100 text-gray-600'
       )}
     >
-      {status}
+      {label ?? status}
     </span>
   )
 }
