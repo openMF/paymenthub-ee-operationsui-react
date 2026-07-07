@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -56,7 +56,7 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
 
   return (
     <div className="flex justify-center py-8">
-      <div className="w-full max-w-125 space-y-6">
+      <div className="w-full max-w-xl space-y-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Create G2P Payment Config</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -120,7 +120,7 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
               id="paymentAccount"
               placeholder="12-digit account number"
               inputMode="numeric"
-              pattern="\d{12}"
+              pattern="[0-9]{12}"
               maxLength={12}
               value={form.paymentAccount}
               onChange={(e) => set('paymentAccount', e.target.value.replace(/\D/g, ''))}

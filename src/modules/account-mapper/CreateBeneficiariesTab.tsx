@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -61,7 +61,7 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
 
   return (
     <div className="flex justify-center py-8">
-      <div className="w-full max-w-125 space-y-6">
+      <div className="w-full max-w-xl space-y-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Add Beneficiary</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
