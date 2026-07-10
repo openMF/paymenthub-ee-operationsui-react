@@ -61,9 +61,11 @@ export default function Settings() {
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) {
-      setLogoPreview(URL.createObjectURL(file))
-    }
+    if (!file) return
+    setLogoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return URL.createObjectURL(file)
+    })
   }
 
   return (
@@ -136,9 +138,9 @@ export default function Settings() {
                   <label className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 px-6 py-8 cursor-pointer hover:bg-gray-100 transition-colors">
                     <ImageIcon className="h-8 w-8 text-gray-400" />
                     <span className="text-sm text-muted-foreground">
-                      Drag & drop or click to upload logo
+                      Click to upload logo
                     </span>
-                    <span className="text-xs text-gray-400">PNG, JPG up to 2MB</span>
+                    <span className="text-xs text-gray-400">PNG, JPG</span>
                     <input
                       type="file"
                       accept="image/*"
