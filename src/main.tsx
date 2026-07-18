@@ -14,6 +14,8 @@ import G2PConfig from '@/pages/G2PConfig'
 import Settings from '@/pages/Settings'
 import RBACConfig from '@/pages/RBACConfig'
 import Reporting from '@/pages/Reporting'
+import Visualizations from '@/pages/Visualizations'
+import NotFound from '@/pages/NotFound'
 
 const queryClient = new QueryClient()
 
@@ -32,8 +34,10 @@ const router = createBrowserRouter([
       { path: 'settings', element: <Settings /> },
       { path: 'rbac', element: <RBACConfig /> },
       { path: 'reporting', element: <Reporting /> },
+      { path: 'visualizations', element: <Visualizations /> },
     ],
   },
+  { path: '*', element: <NotFound /> },
 ])
 
 createRoot(document.getElementById('root')!).render(
