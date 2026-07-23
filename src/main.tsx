@@ -1,8 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
+import KeycloakProvider from '@/lib/keycloak/KeycloakProvider'
 import AppLayout from '@/components/shared/AppLayout'
 import SplashScreen from '@/pages/SplashScreen'
 import LoginPage from '@/pages/LoginPage'
@@ -16,28 +17,48 @@ import RBACConfig from '@/pages/RBACConfig'
 import Reporting from '@/pages/Reporting'
 import Visualizations from '@/pages/Visualizations'
 import NotFound from '@/pages/NotFound'
+import AccountMapperSelfService from '@/pages/AccountMapperSelfService'
+
+// Thin root wrapper: supplies KeycloakProvider inside the router tree
+// so useNavigate is available to the provider.
+function AuthRoot() {
+  return (
+    <KeycloakProvider>
+      <Outlet />
+    </KeycloakProvider>
+  )
+}
 
 const queryClient = new QueryClient()
 
 const router = createBrowserRouter([
+  // Public routes — no Keycloak wrapper (Keycloak handles its own redirect)
   { path: '/splash', element: <SplashScreen /> },
   { path: '/login', element: <LoginPage /> },
+  { path: '/account-mapper/self-service', element: <AccountMapperSelfService /> },
+
+  // Protected routes — wrapped by KeycloakProvider
   {
-    path: '/',
-    element: <AppLayout />,
+    element: <AuthRoot />,
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'payment-hub', element: <PaymentHub /> },
-      { path: 'vouchers', element: <Vouchers /> },
-      { path: 'account-mapper', element: <AccountMapper /> },
-      { path: 'g2p-config', element: <G2PConfig /> },
-      { path: 'settings', element: <Settings /> },
-      { path: 'rbac', element: <RBACConfig /> },
-      { path: 'reporting', element: <Reporting /> },
-      { path: 'visualizations', element: <Visualizations /> },
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <Dashboard /> },
+          { path: 'payment-hub', element: <PaymentHub /> },
+          { path: 'vouchers', element: <Vouchers /> },
+          { path: 'account-mapper', element: <AccountMapper /> },
+          { path: 'g2p-config', element: <G2PConfig /> },
+          { path: 'settings', element: <Settings /> },
+          { path: 'rbac', element: <RBACConfig /> },
+          { path: 'reporting', element: <Reporting /> },
+          { path: 'visualizations', element: <Visualizations /> },
+        ],
+      },
+      { path: '*', element: <NotFound /> },
     ],
   },
-  { path: '*', element: <NotFound /> },
 ])
 
 createRoot(document.getElementById('root')!).render(

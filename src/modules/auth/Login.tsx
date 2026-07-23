@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Lock, Eye, EyeOff } from 'lucide-react'
+import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -22,13 +22,40 @@ export default function Login() {
   const [tenant, setTenant] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (username === 'mifos' && password === 'password') {
-      navigate('/')
-    } else {
-      alert('Invalid credentials. Use mifos / password.')
+    setError('')
+    setLoading(true)
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM}/protocol/openid-connect/token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'password',
+            client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
+            username,
+            password,
+          }),
+        },
+      )
+      const data = await response.json()
+      if (data.access_token) {
+        localStorage.setItem('kc_token', data.access_token)
+        localStorage.setItem('tenant', tenant)
+        navigate('/')
+      } else {
+        setError('Invalid username or password')
+      }
+    } catch {
+      setError('Unable to reach authentication server. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -63,6 +90,7 @@ export default function Login() {
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-8"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -79,6 +107,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-8 pr-9"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -116,11 +145,20 @@ export default function Login() {
               </Label>
             </div>
 
+            {error && (
+              <p className="text-xs text-red-600 text-center -mt-1">{error}</p>
+            )}
+
             <Button
               type="submit"
+              disabled={loading}
               className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white h-9 text-sm font-medium"
             >
-              Sign In
+              {loading ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Signing in…</>
+              ) : (
+                'Sign In'
+              )}
             </Button>
           </form>
 

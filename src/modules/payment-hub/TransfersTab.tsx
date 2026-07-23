@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import { exportCsv, csvDate } from '@/lib/exportCsv'
+import { exportPdf } from '@/lib/exportPdf'
 
 const statuses: Transfer['status'][] = [
   'Completed',
@@ -46,7 +48,8 @@ export default function TransfersTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
+      {/* Filters + Export */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -87,7 +90,7 @@ export default function TransfersTab() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-[160px]">
+          <SelectTrigger className="w-40">
             <SelectValue placeholder="Payer FSP" />
           </SelectTrigger>
           <SelectContent>
@@ -99,6 +102,32 @@ export default function TransfersTab() {
             ))}
           </SelectContent>
         </Select>
+      </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => exportCsv(transfers as unknown as Record<string, unknown>[], `transfers-${csvDate()}.csv`)}
+          >
+            <Download size={13} />
+            Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => exportPdf(
+              'Transfers',
+              ['Transaction ID', 'Start Time', 'Completed Time', 'Source Ministry', 'Bulk Amount', 'Payer FSP', 'Status'],
+              transfers.map((t) => [t.transactionId, t.startTime, t.completedTime || '—', t.sourceMinistry, t.bulkAmount.toLocaleString(), t.payerFSP, t.status]),
+              `transfers-${csvDate()}.pdf`,
+            )}
+          >
+            <FileText size={13} />
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -154,7 +183,7 @@ export default function TransfersTab() {
                 setPage(1)
               }}
             >
-              <SelectTrigger className="w-[70px]">
+              <SelectTrigger className="w-17.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
