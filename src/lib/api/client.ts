@@ -6,7 +6,13 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use((config) => {
   const tenant = localStorage.getItem('tenant') || 'greenbank'
-  config.headers.set('X-TenantId', tenant)
+  config.headers.set('Platform-TenantId', tenant)
+
+  const token = localStorage.getItem('kc_token')
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`)
+  }
+
   return config
 })
 

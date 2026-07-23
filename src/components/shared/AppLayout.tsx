@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowLeftRight,
@@ -9,6 +9,7 @@ import {
   HelpCircle,
   LayoutDashboard,
   Landmark,
+  LogOut,
   Search,
   Settings,
   Shield,
@@ -18,6 +19,7 @@ import {
   Users,
 } from 'lucide-react'
 import { APP_NAME, DEFAULT_TENANT, TENANTS } from '@/config/constants'
+import { useAuth } from '@/lib/keycloak/useAuth'
 
 interface NavItem {
   label: string
@@ -42,14 +44,28 @@ const navItems: NavItem[] = [
 export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const [tenant, setTenant] = useState(
     localStorage.getItem('tenant') ?? DEFAULT_TENANT
   )
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const avatarRef = useRef<HTMLDivElement>(null)
 
   function handleTenantChange(value: string) {
     setTenant(value)
     localStorage.setItem('tenant', value)
   }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   function isActive(item: NavItem) {
     return item.exact
@@ -138,8 +154,42 @@ export default function AppLayout() {
             <HelpCircle size={18} />
           </button>
 
-          <div className="w-8 h-8 rounded-full bg-[#1565C0] flex items-center justify-center">
-            <User size={15} className="text-white" />
+          {/* Avatar dropdown */}
+          <div className="relative" ref={avatarRef}>
+            <button
+              type="button"
+              aria-label="User menu"
+              onClick={() => setAvatarOpen((v) => !v)}
+              className="flex items-center gap-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1565C0]"
+            >
+              <div className="w-8 h-8 rounded-full bg-[#1565C0] flex items-center justify-center">
+                <User size={15} className="text-white" />
+              </div>
+              {user?.name && (
+                <span className="text-sm text-gray-700 font-medium max-w-28 truncate hidden lg:block">
+                  {user.name}
+                </span>
+              )}
+            </button>
+
+            {avatarOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                {user && (
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-800 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setAvatarOpen(false); logout() }}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <LogOut size={14} />
+                  Sign Out
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

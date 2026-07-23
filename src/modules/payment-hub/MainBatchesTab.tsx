@@ -18,7 +18,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import { exportCsv, csvDate } from '@/lib/exportCsv'
+import { exportPdf } from '@/lib/exportPdf'
 
 const statuses: MainBatch['status'][] = [
   'Completed',
@@ -40,7 +42,8 @@ export default function MainBatchesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
+      {/* Filters + Export */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={() => {
@@ -71,6 +74,32 @@ export default function MainBatchesTab() {
             {s}
           </button>
         ))}
+      </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => exportCsv(mainBatches as unknown as Record<string, unknown>[], `main-batches-${csvDate()}.csv`)}
+          >
+            <Download size={13} />
+            Export CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs"
+            onClick={() => exportPdf(
+              'Main Batches',
+              ['Batch Reference', 'Start Time', 'Completed Time', 'Institution ID', 'Source Ministry', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
+              mainBatches.map((b) => [b.batchReferenceNumber, b.startTime, b.completedTime, b.registeringInstitutionId, b.sourceMinistry, b.numberOfInstructions, b.amount.toLocaleString(), b.payerFSP, b.status]),
+              `main-batches-${csvDate()}.pdf`,
+            )}
+          >
+            <FileText size={13} />
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
@@ -132,7 +161,7 @@ export default function MainBatchesTab() {
                 setPage(1)
               }}
             >
-              <SelectTrigger className="w-[70px]">
+              <SelectTrigger className="w-17.5">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
