@@ -23,6 +23,23 @@ export default function KeycloakProvider({ children }: { children: ReactNode }) 
   const [authenticated, setAuthenticated] = useState(false)
 
   useEffect(() => {
+    // Fast path: ROPC token already in localStorage — validate expiry and skip keycloak.init()
+    const existingToken = localStorage.getItem('kc_token')
+    if (existingToken) {
+      try {
+        const payload = JSON.parse(atob(existingToken.split('.')[1]))
+        if (payload.exp * 1000 > Date.now()) {
+          setAuthenticated(true)
+          setInitialized(true)
+          return
+        } else {
+          localStorage.removeItem('kc_token')
+        }
+      } catch {
+        localStorage.removeItem('kc_token')
+      }
+    }
+
     if (keycloak.didInitialize) {
       setAuthenticated(keycloak.authenticated ?? false)
       if (keycloak.token) localStorage.setItem('kc_token', keycloak.token)

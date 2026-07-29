@@ -1,16 +1,15 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle, AlertCircle, UserCircle } from 'lucide-react'
+import { lookupBeneficiary, updateBeneficiary } from '@/lib/api/accountMapper'
+import { beneficiaries as mockBeneficiaries } from './mocks/beneficiaries.mock'
 
 const PAYMENT_MODALITIES = [
   '(01) Mobile Money',
@@ -19,297 +18,231 @@ const PAYMENT_MODALITIES = [
   '(04) Bank Account',
 ]
 
-const FINANCIAL_INSTITUTIONS = [
-  'GreenBank',
-  'BlueBank',
-  'RedBank',
-  'HDFC',
-  'SBI',
-  'DigiWallet',
-  'VoucherFSP',
-]
-
-interface FormState {
+interface BeneficiaryData {
   functionalId: string
-  fullName: string
+  governmentEntity: string
   financialInstitution: string
   financialAddress: string
   paymentModality: string
-  confirmAddress: string
 }
 
-const empty: FormState = {
-  functionalId: '',
-  fullName: '',
-  financialInstitution: '',
-  financialAddress: '',
-  paymentModality: '',
-  confirmAddress: '',
+function findInMock(beneficiaryId: string): BeneficiaryData | null {
+  const hit = mockBeneficiaries.find(
+    (b) =>
+      b.functionalId === beneficiaryId ||
+      b.financialAddress.includes(beneficiaryId),
+  )
+  return hit
+    ? {
+        functionalId: hit.functionalId,
+        governmentEntity: hit.governmentEntity,
+        financialInstitution: hit.financialInstitution,
+        financialAddress: hit.financialAddress,
+        paymentModality: hit.paymentModality,
+      }
+    : null
 }
-
-type Step = 'lookup' | 'update' | 'success'
 
 export default function SelfServicePortal() {
-  const [step, setStep] = useState<Step>('lookup')
-  const [form, setForm] = useState<FormState>(empty)
-  const [lookupId, setLookupId] = useState('')
-  const [lookupError, setLookupError] = useState(false)
+  const [searchParams] = useSearchParams()
+  const beneficiaryId = searchParams.get('beneficiaryId') ?? ''
 
-  function set(field: keyof FormState, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
+  const [financialInstitution, setFinancialInstitution] = useState('')
+  const [financialAddress, setFinancialAddress] = useState('')
+  const [paymentModality, setPaymentModality] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
 
-  function handleLookup(e: React.FormEvent) {
-    e.preventDefault()
-    // Simulate lookup: any non-empty ID that starts with "BEN-" is found
-    if (lookupId.trim().toUpperCase().startsWith('BEN-')) {
-      setLookupError(false)
-      setForm((prev) => ({ ...prev, functionalId: lookupId.trim().toUpperCase() }))
-      setStep('update')
-    } else {
-      setLookupError(true)
+  // Lookup query — falls back to mock on error
+  const { data: apiData, isLoading, isError } = useQuery({
+    queryKey: ['beneficiary', beneficiaryId],
+    queryFn: () => lookupBeneficiary(beneficiaryId),
+    enabled: !!beneficiaryId,
+    retry: 1,
+  })
+
+  // Resolve beneficiary: API first, mock fallback
+  const beneficiary: BeneficiaryData | null =
+    apiData ?? (isError ? findInMock(beneficiaryId) : null)
+
+  // Pre-fill form once data resolves
+  useEffect(() => {
+    if (beneficiary) {
+      setFinancialInstitution(beneficiary.financialInstitution)
+      setFinancialAddress(beneficiary.financialAddress)
+      setPaymentModality(beneficiary.paymentModality)
     }
-  }
+  }, [beneficiary?.functionalId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      updateBeneficiary(beneficiaryId, {
+        financialInstitution,
+        financialAddress,
+        paymentModality,
+      }),
+    onSuccess: () => {
+      setSuccessMsg('Your payment details have been updated successfully.')
+      setErrorMsg('')
+    },
+    onError: () => {
+      setErrorMsg('Failed to update details. Please try again.')
+      setSuccessMsg('')
+    },
+  })
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (form.financialAddress !== form.confirmAddress) return
-    setStep('success')
+    setSuccessMsg('')
+    setErrorMsg('')
+    mutation.mutate()
   }
 
-  function handleReset() {
-    setStep('lookup')
-    setLookupId('')
-    setLookupError(false)
-    setForm(empty)
-  }
+  // ── States ─────────────────────────────────────────────────────────────
 
-  const mismatch = form.confirmAddress.length > 0 && form.financialAddress !== form.confirmAddress
-
-  return (
-    <div className="min-h-screen bg-[#F5F7FA] flex flex-col">
-      {/* Top bar */}
-      <header className="h-14 bg-white border-b border-gray-200 flex items-center px-6 justify-between">
-        <div className="flex items-center gap-2">
-          <img src="/payment-hub-ee.png" alt="Payment Hub EE" className="h-8 w-auto object-contain" />
+  const shell = (content: React.ReactNode) => (
+    <div className="min-h-screen bg-white flex flex-col items-center justify-start py-10 px-4">
+      <div className="w-full max-w-120">
+        {/* Logo */}
+        <div className="flex justify-center mb-6">
+          <img
+            src="/payment-hub-ee.png"
+            alt="Payment Hub EE"
+            className="h-10 object-contain"
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
         </div>
-        <Link
-          to="/account-mapper"
-          className="text-xs text-[#1565C0] hover:underline font-medium"
-        >
-          ← Back to Admin
-        </Link>
-      </header>
-
-      <main className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-
-          {/* Step 1 — Lookup */}
-          {step === 'lookup' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-1 bg-linear-to-r from-[#1565C0] via-[#42A5F5] to-[#1565C0]" />
-              <div className="px-8 py-8 space-y-6">
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
-                    <UserCircle size={24} className="text-[#1565C0]" />
-                  </div>
-                  <h1 className="text-xl font-semibold text-gray-900">Update Your Account</h1>
-                  <p className="text-sm text-gray-500">
-                    Enter your Functional ID to look up your record and update your financial account details.
-                  </p>
-                </div>
-
-                <form onSubmit={handleLookup} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="lookupId">Functional ID</Label>
-                    <Input
-                      id="lookupId"
-                      placeholder="e.g. BEN-FIN-001"
-                      value={lookupId}
-                      onChange={(e) => { setLookupId(e.target.value); setLookupError(false) }}
-                      required
-                    />
-                    {lookupError && (
-                      <p className="flex items-center gap-1.5 text-xs text-red-600 mt-1">
-                        <AlertCircle size={12} />
-                        No record found for this ID. Please check and try again.
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white"
-                  >
-                    Look Up My Record
-                  </Button>
-                </form>
-
-                <p className="text-center text-xs text-gray-400">
-                  Your Functional ID is provided by your government programme administrator.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 2 — Update form */}
-          {step === 'update' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="h-1 bg-linear-to-r from-[#1565C0] via-[#42A5F5] to-[#1565C0]" />
-              <div className="px-8 py-8 space-y-6">
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Update Account Details</h1>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Record found for <span className="font-medium text-gray-700">{form.functionalId}</span>. Fill in your updated details below.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      placeholder="Your full legal name"
-                      value={form.fullName}
-                      onChange={(e) => set('fullName', e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="paymentModality">Payment Modality</Label>
-                    <Select
-                      value={form.paymentModality}
-                      onValueChange={(v) => set('paymentModality', v)}
-                      required
-                    >
-                      <SelectTrigger id="paymentModality" className="w-full">
-                        <SelectValue placeholder="Select how you want to receive payments" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PAYMENT_MODALITIES.map((m) => (
-                          <SelectItem key={m} value={m}>{m}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="financialInstitution">Financial Institution</Label>
-                    <Select
-                      value={form.financialInstitution}
-                      onValueChange={(v) => set('financialInstitution', v)}
-                      required
-                    >
-                      <SelectTrigger id="financialInstitution" className="w-full">
-                        <SelectValue placeholder="Select your bank or wallet provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FINANCIAL_INSTITUTIONS.map((fi) => (
-                          <SelectItem key={fi} value={fi}>{fi}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="financialAddress">Financial Address</Label>
-                    <Input
-                      id="financialAddress"
-                      placeholder="Account number, mobile number, or wallet ID"
-                      value={form.financialAddress}
-                      onChange={(e) => set('financialAddress', e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-gray-400">
-                      Enter your account number, registered mobile number, or wallet identifier.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="confirmAddress">Confirm Financial Address</Label>
-                    <Input
-                      id="confirmAddress"
-                      placeholder="Re-enter to confirm"
-                      value={form.confirmAddress}
-                      onChange={(e) => set('confirmAddress', e.target.value)}
-                      required
-                      className={mismatch ? 'border-red-400 focus-visible:ring-red-300' : ''}
-                    />
-                    {mismatch && (
-                      <p className="flex items-center gap-1.5 text-xs text-red-600">
-                        <AlertCircle size={12} />
-                        Financial addresses do not match.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-2 pt-2">
-                    <Button
-                      type="submit"
-                      className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white"
-                      disabled={mismatch}
-                    >
-                      Submit Update Request
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={handleReset}
-                    >
-                      Start Over
-                    </Button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 — Success */}
-          {step === 'success' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden text-center">
-              <div className="h-1 bg-linear-to-r from-emerald-400 via-emerald-300 to-emerald-400" />
-              <div className="px-8 py-10 space-y-4">
-                <div className="flex justify-center">
-                  <div className="w-14 h-14 rounded-full bg-green-50 flex items-center justify-center">
-                    <CheckCircle size={28} className="text-emerald-500" />
-                  </div>
-                </div>
-                <h2 className="text-xl font-semibold text-gray-900">Request Submitted</h2>
-                <p className="text-sm text-gray-500 max-w-xs mx-auto">
-                  Your account update request has been received. Changes will be reviewed and applied within 1–2 business days.
-                </p>
-                <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-left text-sm space-y-1 mt-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Functional ID</span>
-                    <span className="font-medium text-gray-800">{form.functionalId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Institution</span>
-                    <span className="font-medium text-gray-800">{form.financialInstitution}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Modality</span>
-                    <span className="font-medium text-gray-800">{form.paymentModality}</span>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={handleReset}
-                >
-                  Submit Another Request
-                </Button>
-              </div>
-            </div>
-          )}
+        {/* Card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-md overflow-hidden">
+          <div className="h-1 bg-linear-to-r from-[#1565C0] via-[#42A5F5] to-[#1565C0]" />
+          <div className="px-8 py-8">
+            {content}
+          </div>
         </div>
-      </main>
-
-      <footer className="py-4 text-center text-xs text-gray-400">
-        Powered by Mifos Initiative
-      </footer>
+        <p className="text-center text-xs text-gray-400 mt-6">Powered by Mifos Initiative</p>
+      </div>
     </div>
+  )
+
+  if (!beneficiaryId) {
+    return shell(
+      <div className="flex items-center gap-2 text-sm text-red-600">
+        <AlertCircle size={16} className="shrink-0" />
+        No beneficiary ID provided. Please use a valid link.
+      </div>,
+    )
+  }
+
+  if (isLoading) {
+    return shell(
+      <div className="flex flex-col items-center gap-3 py-6">
+        <Loader2 size={24} className="text-[#1565C0] animate-spin" />
+        <p className="text-sm text-gray-500">Looking up your account…</p>
+      </div>,
+    )
+  }
+
+  if (!beneficiary) {
+    return shell(
+      <div className="flex items-start gap-2 text-sm text-red-600">
+        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+        <span>No account details found for ID: <span className="font-mono font-medium">{beneficiaryId}</span></span>
+      </div>,
+    )
+  }
+
+  // ── Main form ───────────────────────────────────────────────────────────
+
+  return shell(
+    <>
+      <div className="mb-6">
+        <h1 className="text-lg font-semibold text-gray-900">Update Payment Details</h1>
+        <p className="text-sm text-gray-500 mt-1">Review and update your financial account information below.</p>
+      </div>
+
+      {successMsg && (
+        <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 mb-4">
+          <CheckCircle size={15} className="shrink-0 mt-0.5" />
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 mb-4">
+          <AlertCircle size={15} className="shrink-0 mt-0.5" />
+          {errorMsg}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Read-only fields */}
+        <div className="space-y-1.5">
+          <Label htmlFor="beneficiaryId">Beneficiary ID</Label>
+          <Input
+            id="beneficiaryId"
+            value={beneficiary.functionalId}
+            readOnly
+            className="bg-gray-50 text-gray-500 cursor-not-allowed"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="governmentEntity">Government Entity</Label>
+          <Input
+            id="governmentEntity"
+            value={beneficiary.governmentEntity}
+            readOnly
+            className="bg-gray-50 text-gray-500 cursor-not-allowed"
+          />
+        </div>
+
+        {/* Editable fields */}
+        <div className="space-y-1.5">
+          <Label htmlFor="financialInstitution">Financial Institution</Label>
+          <Input
+            id="financialInstitution"
+            placeholder="Enter your bank or wallet provider"
+            value={financialInstitution}
+            onChange={(e) => setFinancialInstitution(e.target.value)}
+            required
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="financialAddress">Financial Address</Label>
+          <Input
+            id="financialAddress"
+            placeholder="Account number, mobile number, or wallet ID"
+            value={financialAddress}
+            onChange={(e) => setFinancialAddress(e.target.value)}
+            required
+          />
+          <p className="text-xs text-gray-400">Your registered account number, mobile number, or wallet identifier.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="paymentModality">Payment Modality</Label>
+          <Select value={paymentModality} onValueChange={setPaymentModality} required>
+            <SelectTrigger id="paymentModality" className="w-full">
+              <SelectValue placeholder="Select payment method" />
+            </SelectTrigger>
+            <SelectContent>
+              {PAYMENT_MODALITIES.map((m) => (
+                <SelectItem key={m} value={m}>{m}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={mutation.isPending}
+          className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2"
+        >
+          {mutation.isPending
+            ? <><Loader2 className="h-4 w-4 animate-spin" /> Updating…</>
+            : 'Update Details'}
+        </Button>
+      </form>
+    </>,
   )
 }
