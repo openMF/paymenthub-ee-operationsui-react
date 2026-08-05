@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { subBatches } from './mocks/subBatches.mock'
-import type { MainBatch } from './types'
+import { useQuery } from '@tanstack/react-query'
+import { fetchMainBatches, fetchSubBatches } from '@/lib/api/paymentHub'
+import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
+import { subBatches as mockSubBatches } from './mocks/subBatches.mock'
+import type { MainBatch, SubBatch } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
   Table,
@@ -18,69 +21,76 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 
-const statuses: MainBatch['status'][] = [
-  'Completed',
-  'Partially Authorized',
-  'Rejected',
-]
+const SKELETON_ROWS = 5
+
+const formatAmount = (amount: number | null) => {
+  if (!amount) return '0'
+  return Math.abs(amount / 100).toLocaleString()
+}
 
 export default function SubBatchesTab() {
-  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const filtered = subBatches.filter(
-    (b) => statusFilter === 'all' || b.status === statusFilter
-  )
+  const { data: mainBatchesData } = useQuery({
+    queryKey: ['mainBatches'],
+    queryFn: fetchMainBatches,
+  })
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
+  const batchOptions: MainBatch[] = mainBatchesData?.data?.length ? mainBatchesData.data : mockBatches
+  const [batchId, setBatchId] = useState<string>(batchOptions[0]?.batchId ?? '')
+
+  const { data: apiData, isLoading, isError } = useQuery({
+    queryKey: ['subBatches', batchId],
+    queryFn: () => fetchSubBatches(batchId),
+    enabled: !!batchId,
+  })
+
+  const rows: SubBatch[] = apiData?.content?.length ? apiData.content : mockSubBatches
+  const totalCount: number = apiData?.totalElements ?? rows.length
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
+  const paginated = rows.slice((page - 1) * perPage, page * perPage)
+
+  const exportRows: Record<string, unknown>[] = rows.map((b) => ({
+    'Sub Batch ID': b.subBatchId ?? '-',
+    'Start Time': b.startedAt ? new Date(b.startedAt).toLocaleString() : '-',
+    'Completed Time': b.completedAt ? new Date(b.completedAt).toLocaleString() : '-',
+    'Total Transactions': b.totalTransactions,
+    Completed: b.completed,
+    Failed: b.failed,
+    Amount: formatAmount(b.totalAmount),
+    Status: b.status ?? 'Unknown',
+  }))
 
   return (
     <div className="space-y-4">
-      {/* Filters + Export */}
+      {/* Batch selector + Export */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => {
-            setStatusFilter('all')
-            setPage(1)
-          }}
-          className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-            statusFilter === 'all'
-              ? 'bg-[#1565C0] text-white border-[#1565C0]'
-              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-          }`}
-        >
-          All
-        </button>
-        {statuses.map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setStatusFilter(s)
-              setPage(1)
-            }}
-            className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-              statusFilter === s
-                ? 'bg-[#1565C0] text-white border-[#1565C0]'
-                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-muted-foreground">Batch</span>
+          <Select
+            value={batchId}
+            onValueChange={(v) => { setBatchId(v); setPage(1) }}
           >
-            {s}
-          </button>
-        ))}
-      </div>
+            <SelectTrigger className="w-56"><SelectValue placeholder="Select a batch" /></SelectTrigger>
+            <SelectContent>
+              {batchOptions.map((b) => (
+                <SelectItem key={b.batchId} value={b.batchId}>{b.batchId}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={() => exportCsv(subBatches as unknown as Record<string, unknown>[], `sub-batches-${csvDate()}.csv`)}
+            onClick={() => exportCsv(exportRows, `sub-batches-${csvDate()}.csv`)}
           >
             <Download size={13} />
             Export CSV
@@ -91,8 +101,8 @@ export default function SubBatchesTab() {
             className="gap-1.5 text-xs"
             onClick={() => exportPdf(
               'Sub Batches',
-              ['Batch Reference', 'Start Time', 'Completed Time', 'Institution ID', 'Source Ministry', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
-              subBatches.map((b) => [b.batchReferenceNumber, b.startTime, b.completedTime, b.registeringInstitutionId, b.sourceMinistry, b.numberOfInstructions, b.amount.toLocaleString(), b.payerFSP, b.status]),
+              ['Sub Batch ID', 'Start Time', 'Completed Time', 'Total Transactions', 'Completed', 'Failed', 'Amount', 'Status'],
+              rows.map((b) => [b.subBatchId ?? '-', b.startedAt ? new Date(b.startedAt).toLocaleString() : '-', b.completedAt ? new Date(b.completedAt).toLocaleString() : '-', b.totalTransactions, b.completed, b.failed, formatAmount(b.totalAmount), b.status ?? 'Unknown']),
               `sub-batches-${csvDate()}.pdf`,
             )}
           >
@@ -102,51 +112,61 @@ export default function SubBatchesTab() {
         </div>
       </div>
 
+      {/* Error banner */}
+      {isError && (
+        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
+          <AlertCircle size={15} className="shrink-0" />
+          Could not reach the API — showing cached data.
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Batch Reference</TableHead>
+              <TableHead>Sub Batch ID</TableHead>
               <TableHead>Start Time</TableHead>
               <TableHead>Completed Time</TableHead>
-              <TableHead>Institution ID</TableHead>
-              <TableHead>Source Ministry</TableHead>
-              <TableHead className="text-right">Instructions</TableHead>
+              <TableHead className="text-right">Total Transactions</TableHead>
+              <TableHead className="text-right">Completed</TableHead>
+              <TableHead className="text-right">Failed</TableHead>
               <TableHead className="text-right">Amount</TableHead>
-              <TableHead>Payer FSP</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((batch) => (
-              <TableRow key={batch.batchReferenceNumber}>
-                <TableCell className="font-medium">
-                  {batch.batchReferenceNumber}
-                </TableCell>
-                <TableCell>{batch.startTime}</TableCell>
-                <TableCell>{batch.completedTime}</TableCell>
-                <TableCell>{batch.registeringInstitutionId}</TableCell>
-                <TableCell>{batch.sourceMinistry}</TableCell>
-                <TableCell className="text-right">
-                  {batch.numberOfInstructions}
-                </TableCell>
-                <TableCell className="text-right">
-                  {batch.amount.toLocaleString()}
-                </TableCell>
-                <TableCell>{batch.payerFSP}</TableCell>
-                <TableCell>
-                  <StatusBadge status={batch.status} />
-                </TableCell>
-              </TableRow>
-            ))}
-            {paginated.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                  No records found.
-                </TableCell>
-              </TableRow>
-            )}
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 8 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : paginated.length > 0
+                ? paginated.map((batch) => (
+                    <TableRow key={batch.id}>
+                      <TableCell className="font-medium">{batch.subBatchId ?? '-'}</TableCell>
+                      <TableCell>{batch.startedAt ? new Date(batch.startedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{batch.completedAt ? new Date(batch.completedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell className="text-right">{batch.totalTransactions}</TableCell>
+                      <TableCell className="text-right">{batch.completed}</TableCell>
+                      <TableCell className="text-right">{batch.failed}</TableCell>
+                      <TableCell className="text-right">{formatAmount(batch.totalAmount)}</TableCell>
+                      <TableCell><StatusBadge status={batch.status} /></TableCell>
+                    </TableRow>
+                  ))
+                : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  )
+            }
           </TableBody>
         </Table>
 
@@ -173,8 +193,10 @@ export default function SubBatchesTab() {
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              {(page - 1) * perPage + 1}–
-              {Math.min(page * perPage, filtered.length)} of {filtered.length}
+              {rows.length === 0
+                ? '0–0 of 0'
+                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, rows.length)} of ${totalCount}`
+              }
             </span>
             <Button
               variant="outline"

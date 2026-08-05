@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line,
   BarChart, Bar,
@@ -15,24 +16,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import StatusBadge from '@/components/shared/StatusBadge'
+import { fetchMainBatches, fetchTransfers } from '@/lib/api/paymentHub'
+import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
+import { transfers as mockTransfers } from '@/modules/payment-hub/mocks/transfers.mock'
+import type { MainBatch } from '@/modules/payment-hub/types'
 
-// ── Mock data ──────────────────────────────────────────────────────────────
-
-const volumeData = [
-  { date: 'Jul 17', completed: 142, failed: 18 },
-  { date: 'Jul 18', completed: 189, failed: 24 },
-  { date: 'Jul 19', completed: 97,  failed: 31 },
-  { date: 'Jul 20', completed: 213, failed: 15 },
-  { date: 'Jul 21', completed: 176, failed: 22 },
-  { date: 'Jul 22', completed: 234, failed: 29 },
-  { date: 'Jul 23', completed: 196, failed: 20 },
-]
-
-const pieData = [
-  { name: 'Completed',            value: 62, color: '#22c55e' },
-  { name: 'Partially Authorized', value: 28, color: '#f97316' },
-  { name: 'Rejected',             value: 10, color: '#ef4444' },
-]
+// ── Mock data (fallback for charts with no real endpoint yet) ──────────────
 
 const ministryData = [
   { ministry: 'Finance',    amount: 560 },
@@ -51,29 +40,70 @@ const dfspData = [
   { dfsp: 'SBI',       rate: 11.5 },
 ]
 
-const failedBatches = [
-  { ref: 'BATCH-004-2026', ministry: 'Ministry of Agriculture', amount: '$780K',  reason: 'Insufficient funds',       status: 'Rejected' },
-  { ref: 'BATCH-008-2026', ministry: 'Ministry of Education',   amount: '$4.2M',  reason: 'Invalid account numbers',  status: 'Rejected' },
-  { ref: 'BATCH-011-2026', ministry: 'Ministry of Transport',   amount: '$1.1M',  reason: 'Compliance check failed',  status: 'Rejected' },
-  { ref: 'BATCH-015-2026', ministry: 'Ministry of Health',      amount: '$650K',  reason: 'Duplicate batch detected', status: 'Rejected' },
-  { ref: 'BATCH-019-2026', ministry: 'Ministry of Finance',     amount: '$2.3M',  reason: 'Timeout — payer FSP',      status: 'Rejected' },
-]
-
 const TENANTS = ['greenbank', 'bluebank', 'redbank']
+
+const STATUS_COLORS: Record<string, string> = {
+  COMPLETED: '#22c55e',
+  IN_PROGRESS: '#f97316',
+  FAILED: '#ef4444',
+}
+
+const formatAmount = (amount: number | null) => {
+  if (!amount) return '0'
+  return Math.abs(amount / 100).toLocaleString()
+}
+
+function buildStatusBreakdown(batches: MainBatch[]) {
+  const total = batches.length
+  if (total === 0) return []
+  const counts: Record<string, number> = { COMPLETED: 0, IN_PROGRESS: 0, FAILED: 0 }
+  for (const b of batches) {
+    if (b.status && b.status in counts) counts[b.status] += 1
+  }
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([status, count]) => ({
+      name: status,
+      value: Number(((count / total) * 100).toFixed(1)),
+      color: STATUS_COLORS[status],
+    }))
+}
+
+function buildVolumeData(transfers: { startedAt: number | null }[]) {
+  const counts = new Map<string, number>()
+  for (const t of transfers) {
+    if (!t.startedAt) continue
+    const key = new Date(t.startedAt).toISOString().slice(0, 10)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-7)
+    .map(([date, count]) => ({
+      date: new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      count,
+    }))
+}
 
 // ── KPI Card ───────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, trend }: { label: string; value: string; trend: 'up' | 'down' }) {
+function KpiCard({ label, value, trend, isLoading }: { label: string; value: string; trend: 'up' | 'down'; isLoading?: boolean }) {
   const isUp = trend === 'up'
   return (
     <Card>
       <CardContent className="pt-5 pb-5">
         <p className="text-xs text-gray-500 font-medium mb-1">{label}</p>
         <div className="flex items-end gap-1.5">
-          <span className="text-3xl font-bold text-gray-800">{value}</span>
-          {isUp
-            ? <TrendingUp size={15} className="text-emerald-500 mb-1.5" />
-            : <TrendingDown size={15} className="text-red-500 mb-1.5" />}
+          {isLoading ? (
+            <div className="h-8 w-20 rounded bg-gray-100 animate-pulse" />
+          ) : (
+            <>
+              <span className="text-3xl font-bold text-gray-800">{value}</span>
+              {isUp
+                ? <TrendingUp size={15} className="text-emerald-500 mb-1.5" />
+                : <TrendingDown size={15} className="text-red-500 mb-1.5" />}
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -86,6 +116,31 @@ export default function Reporting() {
   const [fromDate, setFromDate] = useState('2026-07-17')
   const [toDate, setToDate]     = useState('2026-07-23')
   const [tenant, setTenant]     = useState('all')
+
+  const { data: batchData, isLoading: isBatchesLoading } = useQuery({
+    queryKey: ['mainBatches'],
+    queryFn: fetchMainBatches,
+  })
+
+  const { data: transferData } = useQuery({
+    queryKey: ['transfers'],
+    queryFn: fetchTransfers,
+  })
+
+  const batches: MainBatch[] = batchData?.data?.length ? batchData.data : mockBatches
+  const transfers = transferData?.content?.length ? transferData.content : mockTransfers
+
+  const totalBatches = batches.length
+  const totalTransactions = batches.reduce((sum, b) => sum + b.totalTransactions, 0)
+  const totalAmount = formatAmount(batches.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0))
+  const completedBatches = batches.filter((b) => b.status === 'COMPLETED').length
+  const failedBatchCount = batches.filter((b) => b.status === 'FAILED').length
+  const successRate = totalBatches > 0 ? ((completedBatches / totalBatches) * 100).toFixed(1) : '0.0'
+  const failureRate = totalBatches > 0 ? ((failedBatchCount / totalBatches) * 100).toFixed(1) : '0.0'
+
+  const pieData = buildStatusBreakdown(batches)
+  const volumeData = buildVolumeData(transfers)
+  const failedBatches = batches.filter((b) => b.status === 'FAILED')
 
   return (
     <div className="space-y-6">
@@ -124,10 +179,10 @@ export default function Reporting() {
 
       {/* Row 1 — KPIs */}
       <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Total Transactions"    value="1,247"  trend="up" />
-        <KpiCard label="Total Amount Disbursed" value="$4.2M" trend="up" />
-        <KpiCard label="Success Rate"          value="87.3%"  trend="up" />
-        <KpiCard label="Failure Rate"          value="12.7%"  trend="down" />
+        <KpiCard label="Total Transactions" value={totalTransactions.toLocaleString()} trend="up" isLoading={isBatchesLoading} />
+        <KpiCard label="Total Amount Disbursed" value={`$${totalAmount}`} trend="up" isLoading={isBatchesLoading} />
+        <KpiCard label="Success Rate" value={`${successRate}%`} trend="up" isLoading={isBatchesLoading} />
+        <KpiCard label="Failure Rate" value={`${failureRate}%`} trend="down" isLoading={isBatchesLoading} />
       </div>
 
       {/* Row 2 — Line + Pie */}
@@ -145,8 +200,7 @@ export default function Reporting() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip />
                 <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="completed" stroke="#22c55e" strokeWidth={2} dot={false} name="Completed" />
-                <Line type="monotone" dataKey="failed"    stroke="#ef4444" strokeWidth={2} dot={false} name="Failed" />
+                <Line type="monotone" dataKey="count" stroke="#1565C0" strokeWidth={2} dot={false} name="Transfers" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -240,22 +294,29 @@ export default function Reporting() {
             <thead>
               <tr className="border-t border-gray-100">
                 <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Batch Reference</th>
-                <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Ministry</th>
+                <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Start Time</th>
                 <th className="text-right px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
-                <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Failure Reason</th>
                 <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               </tr>
             </thead>
             <tbody>
-              {failedBatches.map((b) => (
-                <tr key={b.ref} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.ref}</td>
-                  <td className="px-6 py-3 text-gray-600">{b.ministry}</td>
-                  <td className="px-6 py-3 text-right font-medium text-gray-700">{b.amount}</td>
-                  <td className="px-6 py-3 text-gray-500 text-xs">{b.reason}</td>
-                  <td className="px-6 py-3"><StatusBadge status={b.status} /></td>
-                </tr>
-              ))}
+              {failedBatches.length > 0
+                ? failedBatches.map((b) => (
+                    <tr key={b.batchId} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.batchId}</td>
+                      <td className="px-6 py-3 text-gray-600">{b.startedAt ? new Date(b.startedAt).toLocaleString() : '-'}</td>
+                      <td className="px-6 py-3 text-right font-medium text-gray-700">{formatAmount(b.totalAmount)}</td>
+                      <td className="px-6 py-3"><StatusBadge status={b.status} /></td>
+                    </tr>
+                  ))
+                : (
+                    <tr>
+                      <td colSpan={4} className="text-center text-muted-foreground py-8">
+                        No failed batches.
+                      </td>
+                    </tr>
+                  )
+              }
             </tbody>
           </table>
         </CardContent>

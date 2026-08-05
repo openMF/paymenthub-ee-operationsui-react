@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fetchMainBatches } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
@@ -15,10 +16,23 @@ import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'luci
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 
-const STATUSES: MainBatch['status'][] = ['Completed', 'Partially Authorized', 'Rejected']
+const STATUSES = [
+  { label: 'Completed', value: 'COMPLETED' },
+  { label: 'Partially Authorized', value: 'IN_PROGRESS' },
+  { label: 'Rejected', value: 'FAILED' },
+]
 const SKELETON_ROWS = 5
 
+const formatAmount = (amount: number | null) => {
+  if (!amount) return '0'
+  return Math.abs(amount / 100).toLocaleString()
+}
+
+const formatInstitutionId = (id: string | null) =>
+  !id || id === 'null' ? '-' : id
+
 export default function MainBatchesTab() {
+  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
@@ -38,7 +52,16 @@ export default function MainBatchesTab() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
-  const exportRows = filtered as unknown as Record<string, unknown>[]
+  const exportRows: Record<string, unknown>[] = filtered.map((b) => ({
+    'Batch Reference': b.batchId,
+    'Start Time': b.startedAt ? new Date(b.startedAt).toLocaleString() : '-',
+    'Completed Time': b.completedAt ? new Date(b.completedAt).toLocaleString() : '-',
+    'Institution ID': formatInstitutionId(b.registeringInstitutionId),
+    Instructions: b.totalTransactions,
+    Amount: formatAmount(b.totalAmount),
+    'Payer FSP': b.payerFsp ?? '-',
+    Status: b.status ?? 'Unknown',
+  }))
 
   return (
     <div className="space-y-4">
@@ -57,15 +80,15 @@ export default function MainBatchesTab() {
           </button>
           {STATUSES.map((s) => (
             <button
-              key={s}
-              onClick={() => { setStatusFilter(s); setPage(1) }}
+              key={s.value}
+              onClick={() => { setStatusFilter(s.value); setPage(1) }}
               className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
-                statusFilter === s
+                statusFilter === s.value
                   ? 'bg-[#1565C0] text-white border-[#1565C0]'
                   : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
               }`}
             >
-              {s}
+              {s.label}
             </button>
           ))}
         </div>
@@ -80,8 +103,8 @@ export default function MainBatchesTab() {
             variant="outline" size="sm" className="gap-1.5 text-xs"
             onClick={() => exportPdf(
               'Main Batches',
-              ['Batch Reference', 'Start Time', 'Completed Time', 'Institution ID', 'Source Ministry', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
-              filtered.map((b) => [b.batchReferenceNumber, b.startTime, b.completedTime, b.registeringInstitutionId, b.sourceMinistry, b.numberOfInstructions, b.amount.toLocaleString(), b.payerFSP, b.status]),
+              ['Batch Reference', 'Start Time', 'Completed Time', 'Institution ID', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
+              filtered.map((b) => [b.batchId, b.startedAt ? new Date(b.startedAt).toLocaleString() : '-', b.completedAt ? new Date(b.completedAt).toLocaleString() : '-', formatInstitutionId(b.registeringInstitutionId), b.totalTransactions, formatAmount(b.totalAmount), b.payerFsp ?? '-', b.status ?? 'Unknown']),
               `main-batches-${csvDate()}.pdf`,
             )}
           >
@@ -107,7 +130,6 @@ export default function MainBatchesTab() {
               <TableHead>Start Time</TableHead>
               <TableHead>Completed Time</TableHead>
               <TableHead>Institution ID</TableHead>
-              <TableHead>Source Ministry</TableHead>
               <TableHead className="text-right">Instructions</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Payer FSP</TableHead>
@@ -118,7 +140,7 @@ export default function MainBatchesTab() {
             {isLoading
               ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 9 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <TableCell key={j}>
                         <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
                       </TableCell>
@@ -127,21 +149,24 @@ export default function MainBatchesTab() {
                 ))
               : paginated.length > 0
                 ? paginated.map((batch) => (
-                    <TableRow key={batch.batchReferenceNumber}>
-                      <TableCell className="font-medium">{batch.batchReferenceNumber}</TableCell>
-                      <TableCell>{batch.startTime}</TableCell>
-                      <TableCell>{batch.completedTime}</TableCell>
-                      <TableCell>{batch.registeringInstitutionId}</TableCell>
-                      <TableCell>{batch.sourceMinistry}</TableCell>
-                      <TableCell className="text-right">{batch.numberOfInstructions}</TableCell>
-                      <TableCell className="text-right">{batch.amount.toLocaleString()}</TableCell>
-                      <TableCell>{batch.payerFSP}</TableCell>
+                    <TableRow
+                      key={batch.batchId}
+                      className="cursor-pointer"
+                      onClick={() => navigate(`/payment-hub/batch/${batch.batchId}`)}
+                    >
+                      <TableCell className="font-medium">{batch.batchId}</TableCell>
+                      <TableCell>{batch.startedAt ? new Date(batch.startedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{batch.completedAt ? new Date(batch.completedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{formatInstitutionId(batch.registeringInstitutionId)}</TableCell>
+                      <TableCell className="text-right">{batch.totalTransactions}</TableCell>
+                      <TableCell className="text-right">{formatAmount(batch.totalAmount)}</TableCell>
+                      <TableCell>{batch.payerFsp ?? '-'}</TableCell>
                       <TableCell><StatusBadge status={batch.status} /></TableCell>
                     </TableRow>
                   ))
                 : (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                         No records found.
                       </TableCell>
                     </TableRow>

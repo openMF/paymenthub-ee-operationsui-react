@@ -15,8 +15,17 @@ import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'luci
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 
-const STATUSES: Transfer['status'][] = ['Completed', 'Partially Authorized', 'Pending', 'Rejected']
+const STATUSES = ['COMPLETED', 'IN_PROGRESS', 'FAILED']
 const SKELETON_ROWS = 5
+
+const formatAmount = (amount: string | null) => {
+  const n = amount ? Number(amount) : 0
+  if (!n) return '0'
+  return Math.abs(n / 100).toLocaleString()
+}
+
+const formatField = (value: string | null) =>
+  !value || value === 'null' ? '-' : value
 
 export default function TransfersTab() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -32,17 +41,25 @@ export default function TransfersTab() {
   const rows: Transfer[] = (apiData?.content?.length ? apiData.content : mockTransfers)
   const totalCount: number = apiData?.totalElements ?? rows.length
 
-  const payers = [...new Set(rows.map((t) => t.payerFSP))]
+  const payers = [...new Set(rows.map((t) => t.payerDfspId).filter((p): p is string => !!p && p !== 'null'))]
 
   const filtered = rows.filter((t) => {
     if (statusFilter !== 'all' && t.status !== statusFilter) return false
-    if (payerFilter !== 'all' && t.payerFSP !== payerFilter) return false
+    if (payerFilter !== 'all' && t.payerDfspId !== payerFilter) return false
     return true
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
-  const exportRows = filtered as unknown as Record<string, unknown>[]
+  const exportRows: Record<string, unknown>[] = filtered.map((t) => ({
+    'Transaction ID': t.transactionId,
+    'Start Time': t.startedAt ? new Date(t.startedAt).toLocaleString() : '-',
+    'Completed Time': t.completedAt ? new Date(t.completedAt).toLocaleString() : '-',
+    'Batch ID': formatField(t.batchId),
+    Amount: formatAmount(t.amount),
+    'Payer FSP': formatField(t.payerDfspId),
+    Status: t.status ?? 'Unknown',
+  }))
 
   return (
     <div className="space-y-4">
@@ -93,8 +110,8 @@ export default function TransfersTab() {
             variant="outline" size="sm" className="gap-1.5 text-xs"
             onClick={() => exportPdf(
               'Transfers',
-              ['Transaction ID', 'Start Time', 'Completed Time', 'Source Ministry', 'Bulk Amount', 'Payer FSP', 'Status'],
-              filtered.map((t) => [t.transactionId, t.startTime, t.completedTime || '—', t.sourceMinistry, t.bulkAmount.toLocaleString(), t.payerFSP, t.status]),
+              ['Transaction ID', 'Start Time', 'Completed Time', 'Batch ID', 'Amount', 'Payer FSP', 'Status'],
+              filtered.map((t) => [t.transactionId, t.startedAt ? new Date(t.startedAt).toLocaleString() : '-', t.completedAt ? new Date(t.completedAt).toLocaleString() : '-', formatField(t.batchId), formatAmount(t.amount), formatField(t.payerDfspId), t.status ?? 'Unknown']),
               `transfers-${csvDate()}.pdf`,
             )}
           >
@@ -119,8 +136,8 @@ export default function TransfersTab() {
               <TableHead>Transaction ID</TableHead>
               <TableHead>Start Time</TableHead>
               <TableHead>Completed Time</TableHead>
-              <TableHead>Source Ministry</TableHead>
-              <TableHead className="text-right">Bulk Amount</TableHead>
+              <TableHead>Batch ID</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
               <TableHead>Payer FSP</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -138,13 +155,13 @@ export default function TransfersTab() {
                 ))
               : paginated.length > 0
                 ? paginated.map((transfer) => (
-                    <TableRow key={transfer.transactionId}>
+                    <TableRow key={transfer.id}>
                       <TableCell className="font-medium">{transfer.transactionId}</TableCell>
-                      <TableCell>{transfer.startTime}</TableCell>
-                      <TableCell>{transfer.completedTime || '—'}</TableCell>
-                      <TableCell>{transfer.sourceMinistry}</TableCell>
-                      <TableCell className="text-right">{transfer.bulkAmount.toLocaleString()}</TableCell>
-                      <TableCell>{transfer.payerFSP}</TableCell>
+                      <TableCell>{transfer.startedAt ? new Date(transfer.startedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{transfer.completedAt ? new Date(transfer.completedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{formatField(transfer.batchId)}</TableCell>
+                      <TableCell className="text-right">{formatAmount(transfer.amount)}</TableCell>
+                      <TableCell>{formatField(transfer.payerDfspId)}</TableCell>
                       <TableCell><StatusBadge status={transfer.status} /></TableCell>
                     </TableRow>
                   ))
