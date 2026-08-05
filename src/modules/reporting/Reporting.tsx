@@ -117,18 +117,18 @@ export default function Reporting() {
   const [toDate, setToDate]     = useState('2026-07-23')
   const [tenant, setTenant]     = useState('all')
 
-  const { data: batchData, isLoading: isBatchesLoading } = useQuery({
+  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const { data: transferData } = useQuery({
+  const { data: transferData, isError: isTransfersError } = useQuery({
     queryKey: ['transfers'],
     queryFn: fetchTransfers,
   })
 
-  const batches: MainBatch[] = batchData?.data?.length ? batchData.data : mockBatches
-  const transfers = transferData?.content?.length ? transferData.content : mockTransfers
+  const batches: MainBatch[] = isBatchesError ? mockBatches : (batchData?.data ?? [])
+  const transfers = isTransfersError ? mockTransfers : (transferData?.content ?? [])
 
   const totalBatches = batches.length
   const totalTransactions = batches.reduce((sum, b) => sum + b.totalTransactions, 0)

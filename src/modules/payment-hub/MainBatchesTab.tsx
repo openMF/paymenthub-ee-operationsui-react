@@ -42,8 +42,8 @@ export default function MainBatchesTab() {
     queryFn: fetchMainBatches,
   })
 
-  // Fall back to mock data when API returns empty or errors
-  const rows: MainBatch[] = (apiData?.data?.length ? apiData.data : mockBatches)
+  // Fall back to mock data only when the API call fails
+  const rows: MainBatch[] = isError ? mockBatches : (apiData?.data ?? [])
   const totalCount: number = apiData?.totalBatches ?? rows.length
 
   const filtered = rows.filter(

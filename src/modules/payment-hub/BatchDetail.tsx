@@ -47,12 +47,12 @@ export default function BatchDetail() {
   const { batchId } = useParams()
   const navigate = useNavigate()
 
-  const { data: batchData } = useQuery({
+  const { data: batchData, isError: isBatchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batches = batchData?.data?.length ? batchData.data : mockBatches
+  const batches = isBatchesError ? mockBatches : (batchData?.data ?? [])
   const batch = batches.find((b) => b.batchId === batchId)
 
   const { data: subBatchData, isLoading: isSubBatchesLoading, isError: isSubBatchesError } = useQuery({
@@ -61,7 +61,9 @@ export default function BatchDetail() {
     enabled: !!batchId,
   })
 
-  const subBatches = subBatchData?.content?.length ? subBatchData.content : mockSubBatches
+  const subBatches = isSubBatchesError
+    ? mockSubBatches.filter((sb) => sb.batchId === batchId)
+    : (subBatchData?.content ?? [])
 
   return (
     <div className="space-y-6">

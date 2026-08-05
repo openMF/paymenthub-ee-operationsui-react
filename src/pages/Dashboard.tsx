@@ -20,12 +20,12 @@ function formatAmount(n: number) {
 export default function Dashboard() {
   const navigate = useNavigate()
 
-  const { data: batchData, isLoading: isBatchesLoading } = useQuery({
+  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batches = batchData?.data?.length ? batchData.data : mockBatches
+  const batches = isBatchesError ? mockBatches : (batchData?.data ?? [])
   const recentBatches = batches.slice(0, 5)
 
   const totalBatches = batches.length

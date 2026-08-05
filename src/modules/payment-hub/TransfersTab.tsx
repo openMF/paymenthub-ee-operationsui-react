@@ -38,7 +38,7 @@ export default function TransfersTab() {
     queryFn: fetchTransfers,
   })
 
-  const rows: Transfer[] = (apiData?.content?.length ? apiData.content : mockTransfers)
+  const rows: Transfer[] = isError ? mockTransfers : (apiData?.content ?? [])
   const totalCount: number = apiData?.totalElements ?? rows.length
 
   const payers = [...new Set(rows.map((t) => t.payerDfspId).filter((p): p is string => !!p && p !== 'null'))]

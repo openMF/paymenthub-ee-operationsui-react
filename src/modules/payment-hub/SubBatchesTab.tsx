@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchMainBatches, fetchSubBatches } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
@@ -36,13 +36,19 @@ export default function SubBatchesTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data: mainBatchesData } = useQuery({
+  const { data: mainBatchesData, isError: isBatchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batchOptions: MainBatch[] = mainBatchesData?.data?.length ? mainBatchesData.data : mockBatches
-  const [batchId, setBatchId] = useState<string>(batchOptions[0]?.batchId ?? '')
+  const batchOptions: MainBatch[] = isBatchesError ? mockBatches : (mainBatchesData?.data ?? [])
+  const [batchId, setBatchId] = useState<string>('')
+
+  useEffect(() => {
+    if (!batchId && batchOptions.length > 0) {
+      setBatchId(batchOptions[0].batchId)
+    }
+  }, [batchId, batchOptions])
 
   const { data: apiData, isLoading, isError } = useQuery({
     queryKey: ['subBatches', batchId],
@@ -50,7 +56,9 @@ export default function SubBatchesTab() {
     enabled: !!batchId,
   })
 
-  const rows: SubBatch[] = apiData?.content?.length ? apiData.content : mockSubBatches
+  const rows: SubBatch[] = isError
+    ? mockSubBatches.filter((sb) => sb.batchId === batchId)
+    : (apiData?.content ?? [])
   const totalCount: number = apiData?.totalElements ?? rows.length
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
