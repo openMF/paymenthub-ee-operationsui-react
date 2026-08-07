@@ -9,6 +9,7 @@ import SplashScreen from '@/pages/SplashScreen'
 import LoginPage from '@/pages/LoginPage'
 import Dashboard from '@/pages/Dashboard'
 import PaymentHub from '@/pages/PaymentHub'
+import BatchDetail from '@/pages/BatchDetail'
 import Vouchers from '@/pages/Vouchers'
 import AccountMapper from '@/pages/AccountMapper'
 import G2PConfig from '@/pages/G2PConfig'
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> },
           { path: 'payment-hub', element: <PaymentHub /> },
+          { path: 'payment-hub/batch/:batchId', element: <BatchDetail /> },
           { path: 'vouchers', element: <Vouchers /> },
           { path: 'account-mapper', element: <AccountMapper /> },
           { path: 'g2p-config', element: <G2PConfig /> },

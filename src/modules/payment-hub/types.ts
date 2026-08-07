@@ -1,21 +1,52 @@
 export interface MainBatch {
-  batchReferenceNumber: string
-  startTime: string
-  completedTime: string
-  registeringInstitutionId: string
-  sourceMinistry: string
-  numberOfInstructions: number
-  amount: number
-  payerFSP: string
-  status: 'Completed' | 'Partially Authorized' | 'Rejected'
+  id: number
+  batchId: string
+  totalTransactions: number
+  ongoing: number
+  failed: number
+  completed: number
+  totalAmount: number | null
+  completedAmount: number | null
+  payerFsp: string
+  status: string | null
+  startedAt: number | null
+  completedAt: number | null
+  registeringInstitutionId: string | null
+  correlationId: string
+}
+
+export interface SubBatch {
+  id: number
+  batchId: string
+  subBatchId: string | null
+  totalTransactions: number
+  completed: number
+  failed: number
+  ongoing: number
+  totalAmount: number | null
+  status: string | null
+  payerFsp: string | null
+  startedAt: number | null
+  completedAt: number | null
 }
 
 export interface Transfer {
+  id: number
   transactionId: string
-  startTime: string
-  completedTime: string
-  sourceMinistry: string
-  bulkAmount: number
-  payerFSP: string
-  status: 'Completed' | 'Partially Authorized' | 'Pending' | 'Rejected'
+  startedAt: number | null
+  completedAt: number | null
+  status: string | null
+  statusDetail: string | null
+  payeeDfspId: string | null
+  payeePartyId: string | null
+  payeePartyIdType: string | null
+  payerDfspId: string | null
+  payerPartyId: string | null
+  payerPartyIdType: string | null
+  amount: string | null
+  currency: string | null
+  direction: string | null
+  errorInformation: string | null
+  batchId: string | null
+  clientCorrelationId: string | null
 }
