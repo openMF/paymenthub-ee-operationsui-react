@@ -66,13 +66,17 @@ const router = createBrowserRouter([
 
 async function enableMocking() {
   if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_MSW === 'true') {
-    const { worker } = await import('./mocks/browser')
-    await worker.start({
-      onUnhandledRequest: 'bypass',
-      serviceWorker: {
-        url: '/mockServiceWorker.js',
-      },
-    })
+    try {
+      const { worker } = await import('./mocks/browser')
+      await worker.start({
+        onUnhandledRequest: 'bypass',
+        serviceWorker: {
+          url: '/mockServiceWorker.js',
+        },
+      })
+    } catch (e) {
+      console.warn('MSW failed to start:', e)
+    }
   }
 }
 

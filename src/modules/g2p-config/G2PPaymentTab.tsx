@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const filterChips = [
   'Government Entity',
@@ -45,8 +45,11 @@ export default function G2PPaymentTab() {
   const { data: apiData, isLoading, isError } = useQuery({
     queryKey: ['g2pConfigs'],
     queryFn: fetchG2PConfigs,
+    retry: false,
   })
 
+  // Silently fall back to mock data if the API is unreachable (e.g. G2P
+  // service not deployed yet) — no error banner shown to the user.
   const rows: G2PConfig[] = isError ? mockConfigs : (apiData ?? [])
 
   const filtered = rows.filter(
@@ -119,14 +122,6 @@ export default function G2PPaymentTab() {
           </div>
         )}
       </div>
-
-      {/* Error banner */}
-      {isError && (
-        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-          <AlertCircle size={15} className="shrink-0" />
-          Could not reach the API — showing cached data.
-        </div>
-      )}
 
       {/* Table */}
       <div className="rounded-lg border bg-white">

@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle } from 'lucide-react'
 import type { G2PConfig, GovernmentEntity, Program, DFSP } from './types'
 import { fetchGovernmentEntities, fetchPrograms, fetchDFSPs } from '@/lib/api/g2pConfig'
 
@@ -40,6 +40,7 @@ const empty: FormState = {
 export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
   const [form, setForm] = useState<FormState>(empty)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const { data: governmentEntities } = useQuery({
     queryKey: ['governmentEntities'],
@@ -56,10 +57,16 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    setError(null)
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.governmentEntity || !form.program || !form.payerDFSP || !form.paymentAccount || !form.status) {
+      setError('Please fill in all required fields')
+      return
+    }
+    setError(null)
     setSuccess(true)
     setTimeout(() => {
       setSuccess(false)
@@ -198,6 +205,13 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
             </Button>
           </div>
         </form>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
       </div>
     </div>
   )

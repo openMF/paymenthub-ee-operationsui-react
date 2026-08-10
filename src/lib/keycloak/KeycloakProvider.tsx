@@ -6,6 +6,13 @@ import { useToast } from '@/components/shared/ToastProvider'
 const EXPIRY_CHECK_INTERVAL_MS = 60_000
 const EXPIRY_WARNING_THRESHOLD_MS = 120_000
 
+function decodeJwtPayload(token: string) {
+  const base64Url = token.split('.')[1]
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
+  return JSON.parse(atob(padded))
+}
+
 interface KeycloakContextValue {
   keycloak: typeof keycloak
   authenticated: boolean
@@ -33,7 +40,7 @@ export default function KeycloakProvider({ children }: { children: ReactNode }) 
     const existingToken = localStorage.getItem('kc_token')
     if (existingToken) {
       try {
-        const payload = JSON.parse(atob(existingToken.split('.')[1]))
+        const payload = decodeJwtPayload(existingToken)
         if (payload.exp * 1000 > Date.now()) {
           setAuthenticated(true)
           setInitialized(true)
@@ -96,7 +103,7 @@ export default function KeycloakProvider({ children }: { children: ReactNode }) 
       if (!token) return
 
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
+        const payload = decodeJwtPayload(token)
         const msUntilExpiry = payload.exp * 1000 - Date.now()
 
         if (msUntilExpiry < 0) {

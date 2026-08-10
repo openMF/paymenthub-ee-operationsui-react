@@ -15,19 +15,9 @@ export interface MainBatch {
   correlationId: string
 }
 
-export interface SubBatch {
-  id: number
-  batchId: string
-  subBatchId: string | null
-  totalTransactions: number
-  completed: number
-  failed: number
-  ongoing: number
-  totalAmount: number | null
-  status: string | null
-  payerFsp: string | null
-  startedAt: number | null
-  completedAt: number | null
+export interface BatchTransaction {
+  transactionId: string
+  status: string
 }
 
 export interface Transfer {

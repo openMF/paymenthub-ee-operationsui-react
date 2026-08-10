@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchMainBatches, fetchSubBatches } from '@/lib/api/paymentHub'
+import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
-import { subBatches as mockSubBatches } from './mocks/subBatches.mock'
-import type { MainBatch, SubBatch } from './types'
+import { batchTransactionsByBatch } from './mocks/batchTransactions.mock'
+import type { MainBatch, BatchTransaction } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
   Table,
@@ -27,9 +27,8 @@ import { exportPdf } from '@/lib/exportPdf'
 
 const SKELETON_ROWS = 5
 
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
+function toRows(data: Record<string, string>): BatchTransaction[] {
+  return Object.entries(data).map(([transactionId, status]) => ({ transactionId, status }))
 }
 
 export default function SubBatchesTab() {
@@ -51,28 +50,21 @@ export default function SubBatchesTab() {
   }, [batchId, batchOptions])
 
   const { data: apiData, isLoading, isError } = useQuery({
-    queryKey: ['subBatches', batchId],
-    queryFn: () => fetchSubBatches(batchId),
+    queryKey: ['batchTransactions', batchId],
+    queryFn: () => fetchBatchTransactions(batchId),
     enabled: !!batchId,
   })
 
-  const rows: SubBatch[] = isError
-    ? mockSubBatches.filter((sb) => sb.batchId === batchId)
-    : (apiData?.content ?? [])
-  const totalCount: number = apiData?.totalElements ?? rows.length
+  const rows: BatchTransaction[] = isError
+    ? toRows(batchTransactionsByBatch[batchId] ?? {})
+    : toRows(apiData ?? {})
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
   const paginated = rows.slice((page - 1) * perPage, page * perPage)
 
-  const exportRows: Record<string, unknown>[] = rows.map((b) => ({
-    'Sub Batch ID': b.subBatchId ?? '-',
-    'Start Time': b.startedAt ? new Date(b.startedAt).toLocaleString() : '-',
-    'Completed Time': b.completedAt ? new Date(b.completedAt).toLocaleString() : '-',
-    'Total Transactions': b.totalTransactions,
-    Completed: b.completed,
-    Failed: b.failed,
-    Amount: formatAmount(b.totalAmount),
-    Status: b.status ?? 'Unknown',
+  const exportRows: Record<string, unknown>[] = rows.map((t) => ({
+    'Transaction ID': t.transactionId,
+    Status: t.status,
   }))
 
   return (
@@ -98,7 +90,7 @@ export default function SubBatchesTab() {
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={() => exportCsv(exportRows, `sub-batches-${csvDate()}.csv`)}
+            onClick={() => exportCsv(exportRows, `batch-transactions-${csvDate()}.csv`)}
           >
             <Download size={13} />
             Export CSV
@@ -108,10 +100,10 @@ export default function SubBatchesTab() {
             size="sm"
             className="gap-1.5 text-xs"
             onClick={() => exportPdf(
-              'Sub Batches',
-              ['Sub Batch ID', 'Start Time', 'Completed Time', 'Total Transactions', 'Completed', 'Failed', 'Amount', 'Status'],
-              rows.map((b) => [b.subBatchId ?? '-', b.startedAt ? new Date(b.startedAt).toLocaleString() : '-', b.completedAt ? new Date(b.completedAt).toLocaleString() : '-', b.totalTransactions, b.completed, b.failed, formatAmount(b.totalAmount), b.status ?? 'Unknown']),
-              `sub-batches-${csvDate()}.pdf`,
+              'Batch Transactions',
+              ['Transaction ID', 'Status'],
+              rows.map((t) => [t.transactionId, t.status]),
+              `batch-transactions-${csvDate()}.pdf`,
             )}
           >
             <FileText size={13} />
@@ -133,13 +125,7 @@ export default function SubBatchesTab() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Sub Batch ID</TableHead>
-              <TableHead>Start Time</TableHead>
-              <TableHead>Completed Time</TableHead>
-              <TableHead className="text-right">Total Transactions</TableHead>
-              <TableHead className="text-right">Completed</TableHead>
-              <TableHead className="text-right">Failed</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+              <TableHead>Transaction ID</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -147,7 +133,7 @@ export default function SubBatchesTab() {
             {isLoading
               ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((__, j) => (
+                    {Array.from({ length: 2 }).map((__, j) => (
                       <TableCell key={j}>
                         <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
                       </TableCell>
@@ -155,21 +141,15 @@ export default function SubBatchesTab() {
                   </TableRow>
                 ))
               : paginated.length > 0
-                ? paginated.map((batch) => (
-                    <TableRow key={batch.id}>
-                      <TableCell className="font-medium">{batch.subBatchId ?? '-'}</TableCell>
-                      <TableCell>{batch.startedAt ? new Date(batch.startedAt).toLocaleString() : '-'}</TableCell>
-                      <TableCell>{batch.completedAt ? new Date(batch.completedAt).toLocaleString() : '-'}</TableCell>
-                      <TableCell className="text-right">{batch.totalTransactions}</TableCell>
-                      <TableCell className="text-right">{batch.completed}</TableCell>
-                      <TableCell className="text-right">{batch.failed}</TableCell>
-                      <TableCell className="text-right">{formatAmount(batch.totalAmount)}</TableCell>
-                      <TableCell><StatusBadge status={batch.status} /></TableCell>
+                ? paginated.map((t) => (
+                    <TableRow key={t.transactionId}>
+                      <TableCell className="font-medium">{t.transactionId}</TableCell>
+                      <TableCell><StatusBadge status={t.status} /></TableCell>
                     </TableRow>
                   ))
                 : (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
                         No records found.
                       </TableCell>
                     </TableRow>
@@ -203,7 +183,7 @@ export default function SubBatchesTab() {
             <span>
               {rows.length === 0
                 ? '0–0 of 0'
-                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, rows.length)} of ${totalCount}`
+                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, rows.length)} of ${rows.length}`
               }
             </span>
             <Button

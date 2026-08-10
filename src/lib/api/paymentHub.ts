@@ -12,7 +12,9 @@ export const fetchTransfers = async () => {
   return response.data
 }
 
-export const fetchSubBatches = async (batchId: string) => {
-  const response = await apiClient.get(`/batches/${batchId}/subBatches`)
+export const fetchBatchTransactions = async (batchId: string) => {
+  const response = await apiClient.get('/batch/transactions', {
+    params: { batchId, page: 0, size: 20 },
+  })
   return response.data
 }

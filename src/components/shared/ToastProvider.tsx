@@ -48,7 +48,12 @@ export default function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"
+      >
         {toasts.map((t) => {
           const Icon = variantIcons[t.variant]
           return (
