@@ -65,7 +65,9 @@ src/
 root/
 ├── components.json            # ShadCN CLI config
 ├── index.html                 # App HTML shell + favicon
-├── .env.example               # Environment variable template
+├── .env.example                # Environment variable template
+├── .env.development             # Normal dev — Gazelle real APIs (gitignored)
+├── .env.g2p                     # G2P Config mock testing (gitignored)
 └── vite.config.ts
 ```
 
@@ -92,7 +94,7 @@ cd ph-ee-operations-web-react
 npm install
 
 # 4. Copy and configure environment variables
-cp .env.example .env
+cp .env.example .env.development
 
 # 5. Start the development server
 npm run dev
@@ -102,9 +104,36 @@ Navigate to `http://localhost:5173/` — the app auto-reloads on file changes.
 
 ---
 
+## Development Modes
+
+The app supports two Vite modes, each loading its own env file, so you can switch between hitting the real Gazelle backend and testing the G2P Config module against MSW mocks without editing env vars by hand.
+
+### Normal dev (Gazelle real APIs)
+
+Loads `.env.development`.
+
+```bash
+cp .env.example .env.development
+npm run dev
+```
+
+### G2P Config mock testing
+
+Loads `.env.g2p`. Starts MSW (`VITE_ENABLE_MSW=true`) to serve mocked responses for the G2P Config endpoints (`/g2pPaymentConfig`, `/governmentEntity`, `/program`, `/dfsp`) — useful when the real G2P backend at `VITE_G2P_SERVICE_URL` isn't deployed yet.
+
+```bash
+cp .env.example .env.g2p
+# then edit .env.g2p and set VITE_ENABLE_MSW=true
+npm run dev:g2p
+```
+
+Building for either mode works the same way: `npm run build` (normal) or `npm run build:g2p` (G2P mocks) — see [Building for Production](#building-for-production).
+
+---
+
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in the values.
+Copy `.env.example` to `.env.development` (normal dev) or `.env.g2p` (G2P mock testing) and fill in the values — see [Development Modes](#development-modes).
 
 | Variable | Description |
 |---|---|
@@ -114,6 +143,8 @@ Copy `.env.example` to `.env` and fill in the values.
 | `VITE_KEYCLOAK_REALM` | Keycloak realm (e.g. `paymenthub`) |
 | `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client ID (e.g. `opsapp`) |
 | `VITE_TENANT_ID` | Default Platform Tenant Identifier used in API calls |
+| `VITE_G2P_SERVICE_URL` | Base URL for the G2P Payment Config backend |
+| `VITE_ENABLE_MSW` | When `true` (and running in dev), starts MSW to mock the G2P Config endpoints — see [G2P Config mock testing](#g2p-config-mock-testing) |
 
 ---
 
@@ -138,7 +169,7 @@ Then configure at `http://localhost:8180`:
    - **Web origins:** `http://localhost:5173`
 3. Create a test user and set credentials
 
-Update `.env`:
+Update `.env.development` (or `.env.g2p` if using G2P mock mode):
 
 ```env
 VITE_KEYCLOAK_URL=http://localhost:8180
@@ -159,7 +190,7 @@ Add to your hosts file (`C:\Windows\System32\drivers\etc\hosts` on Windows, `/et
 <VM-IP>  bulk-connector.mifos.gazelle.test
 ```
 
-Update `.env`:
+Update `.env.development` (or `.env.g2p` if using G2P mock mode):
 
 ```env
 VITE_API_BASE_URL=https://ops.mifos.gazelle.test/api/v1
@@ -211,7 +242,8 @@ http://localhost:5173/account-mapper/self-service?beneficiaryId=9876543210
 ## Building for Production
 
 ```bash
-npm run build
+npm run build       # normal build, loads .env.production if present, else .env
+npm run build:g2p   # G2P mock-mode build, loads .env.g2p
 ```
 
 Build artifacts are output to `dist/`.

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { g2pConfigs } from './mocks/g2pConfigs.mock'
+import { useQuery } from '@tanstack/react-query'
+import { fetchG2PConfigs } from '@/lib/api/g2pConfig'
+import { g2pConfigs as mockConfigs } from './mocks/g2pConfigs.mock'
 import type { G2PConfig } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -18,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 
 const filterChips = [
   'Government Entity',
@@ -32,13 +34,22 @@ type FilterChip = (typeof filterChips)[number]
 
 const statuses: G2PConfig['status'][] = ['Active', 'Inactive']
 
+const SKELETON_ROWS = 5
+
 export default function G2PPaymentTab() {
   const [activeChip, setActiveChip] = useState<FilterChip | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const filtered = g2pConfigs.filter(
+  const { data: apiData, isLoading, isError } = useQuery({
+    queryKey: ['g2pConfigs'],
+    queryFn: fetchG2PConfigs,
+  })
+
+  const rows: G2PConfig[] = isError ? mockConfigs : (apiData ?? [])
+
+  const filtered = rows.filter(
     (c) => statusFilter === 'all' || c.status === statusFilter
   )
 
@@ -109,6 +120,14 @@ export default function G2PPaymentTab() {
         )}
       </div>
 
+      {/* Error banner */}
+      {isError && (
+        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
+          <AlertCircle size={15} className="shrink-0" />
+          Could not reach the API — showing cached data.
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-white">
         <Table>
@@ -122,21 +141,31 @@ export default function G2PPaymentTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((config) => (
-              <TableRow key={config.paymentAccount}>
-                <TableCell>{config.governmentEntity}</TableCell>
-                <TableCell>{config.program}</TableCell>
-                <TableCell>{config.payerDFSP}</TableCell>
-                <TableCell className="font-medium">{config.paymentAccount}</TableCell>
-                <TableCell>
-                  <StatusBadge
-                    status={config.status === 'Inactive' ? 'Inactive-G2P' : config.status}
-                    label={config.status}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-            {paginated.length === 0 && (
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : paginated.map((config) => (
+                  <TableRow key={config.id ?? config.paymentAccount}>
+                    <TableCell>{config.governmentEntity}</TableCell>
+                    <TableCell>{config.program}</TableCell>
+                    <TableCell>{config.payerDFSP}</TableCell>
+                    <TableCell className="font-medium">{config.paymentAccount}</TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={config.status === 'Inactive' ? 'Inactive-G2P' : config.status}
+                        label={config.status}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+            {!isLoading && paginated.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   No records found.
