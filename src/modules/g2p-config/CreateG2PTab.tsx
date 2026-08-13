@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -9,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle } from 'lucide-react'
-import type { G2PConfig } from './types'
+import { CheckCircle, AlertCircle } from 'lucide-react'
+import type { G2PConfig, GovernmentEntity, Program, DFSP } from './types'
+import { fetchGovernmentEntities, fetchPrograms, fetchDFSPs } from '@/lib/api/g2pConfig'
 
-const PAYER_DFSPS = ['Green Bank', 'Blue Bank', 'Red Bank', 'SBI', 'HDFC']
 const STATUSES: G2PConfig['status'][] = ['Active', 'Inactive']
 
 interface Props {
@@ -39,13 +40,33 @@ const empty: FormState = {
 export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
   const [form, setForm] = useState<FormState>(empty)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const { data: governmentEntities } = useQuery({
+    queryKey: ['governmentEntities'],
+    queryFn: fetchGovernmentEntities,
+  })
+  const { data: programs } = useQuery({
+    queryKey: ['programs'],
+    queryFn: fetchPrograms,
+  })
+  const { data: dfsps } = useQuery({
+    queryKey: ['dfsps'],
+    queryFn: fetchDFSPs,
+  })
 
   function set(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
+    setError(null)
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!form.governmentEntity || !form.program || !form.payerDFSP || !form.paymentAccount || !form.status) {
+      setError('Please fill in all required fields')
+      return
+    }
+    setError(null)
     setSuccess(true)
     setTimeout(() => {
       setSuccess(false)
@@ -74,24 +95,42 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="governmentEntity">Government Entity</Label>
-            <Input
-              id="governmentEntity"
-              placeholder="e.g. Ministry of Finance"
+            <Select
               value={form.governmentEntity}
-              onChange={(e) => set('governmentEntity', e.target.value)}
+              onValueChange={(v) => set('governmentEntity', v)}
               required
-            />
+            >
+              <SelectTrigger id="governmentEntity" className="w-full">
+                <SelectValue placeholder="Select government entity" />
+              </SelectTrigger>
+              <SelectContent>
+                {(governmentEntities ?? []).map((e: GovernmentEntity) => (
+                  <SelectItem key={e.id} value={e.name}>
+                    {e.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="program">Program</Label>
-            <Input
-              id="program"
-              placeholder="e.g. Financial Aid"
+            <Select
               value={form.program}
-              onChange={(e) => set('program', e.target.value)}
+              onValueChange={(v) => set('program', v)}
               required
-            />
+            >
+              <SelectTrigger id="program" className="w-full">
+                <SelectValue placeholder="Select program" />
+              </SelectTrigger>
+              <SelectContent>
+                {(programs ?? []).map((p: Program) => (
+                  <SelectItem key={p.id} value={p.name}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1.5">
@@ -105,9 +144,9 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
                 <SelectValue placeholder="Select bank" />
               </SelectTrigger>
               <SelectContent>
-                {PAYER_DFSPS.map((d) => (
-                  <SelectItem key={d} value={d}>
-                    {d}
+                {(dfsps ?? []).map((d: DFSP) => (
+                  <SelectItem key={d.id} value={d.name}>
+                    {d.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -166,6 +205,13 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
             </Button>
           </div>
         </form>
+
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
+        )}
       </div>
     </div>
   )

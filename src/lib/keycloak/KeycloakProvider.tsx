@@ -1,6 +1,17 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import keycloak from './keycloak'
+import { useToast } from '@/components/shared/ToastProvider'
+
+const EXPIRY_CHECK_INTERVAL_MS = 60_000
+const EXPIRY_WARNING_THRESHOLD_MS = 120_000
+
+function decodeJwtPayload(token: string) {
+  const base64Url = token.split('.')[1]
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
+  return JSON.parse(atob(padded))
+}
 
 interface KeycloakContextValue {
   keycloak: typeof keycloak
@@ -19,15 +30,17 @@ export function useKeycloak() {
 
 export default function KeycloakProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [initialized, setInitialized] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
+  const warnedForTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     // Fast path: ROPC token already in localStorage — validate expiry and skip keycloak.init()
     const existingToken = localStorage.getItem('kc_token')
     if (existingToken) {
       try {
-        const payload = JSON.parse(atob(existingToken.split('.')[1]))
+        const payload = decodeJwtPayload(existingToken)
         if (payload.exp * 1000 > Date.now()) {
           setAuthenticated(true)
           setInitialized(true)
@@ -82,6 +95,37 @@ export default function KeycloakProvider({ children }: { children: ReactNode }) 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Poll token expiry — auto-logout when expired, warn shortly before
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = localStorage.getItem('kc_token')
+      if (!token) return
+
+      try {
+        const payload = decodeJwtPayload(token)
+        const msUntilExpiry = payload.exp * 1000 - Date.now()
+
+        if (msUntilExpiry < 0) {
+          localStorage.removeItem('kc_token')
+          setAuthenticated(false)
+          navigate('/login', { replace: true })
+          return
+        }
+
+        if (msUntilExpiry < EXPIRY_WARNING_THRESHOLD_MS && warnedForTokenRef.current !== token) {
+          warnedForTokenRef.current = token
+          toast('Your session will expire in 2 minutes', 'warning')
+        }
+      } catch {
+        localStorage.removeItem('kc_token')
+        setAuthenticated(false)
+        navigate('/login', { replace: true })
+      }
+    }, EXPIRY_CHECK_INTERVAL_MS)
+
+    return () => clearInterval(interval)
+  }, [navigate, toast])
 
   function logout() {
     localStorage.removeItem('kc_token')

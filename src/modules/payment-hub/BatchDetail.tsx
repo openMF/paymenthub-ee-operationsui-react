@@ -1,9 +1,10 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
-import { fetchMainBatches, fetchSubBatches } from '@/lib/api/paymentHub'
+import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
-import { subBatches as mockSubBatches } from './mocks/subBatches.mock'
+import { batchTransactionsByBatch } from './mocks/batchTransactions.mock'
+import type { BatchTransaction } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -22,6 +23,10 @@ const formatDate = (ts: number | null) => (ts ? new Date(ts).toLocaleString() : 
 
 const formatField = (value: string | null | undefined) =>
   !value || value === 'null' ? '-' : value
+
+function toRows(data: Record<string, string>): BatchTransaction[] {
+  return Object.entries(data).map(([transactionId, status]) => ({ transactionId, status }))
+}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -55,15 +60,15 @@ export default function BatchDetail() {
   const batches = isBatchesError ? mockBatches : (batchData?.data ?? [])
   const batch = batches.find((b) => b.batchId === batchId)
 
-  const { data: subBatchData, isLoading: isSubBatchesLoading, isError: isSubBatchesError } = useQuery({
-    queryKey: ['subBatches', batchId],
-    queryFn: () => fetchSubBatches(batchId!),
+  const { data: transactionsData, isLoading: isTransactionsLoading, isError: isTransactionsError } = useQuery({
+    queryKey: ['batchTransactions', batchId],
+    queryFn: () => fetchBatchTransactions(batchId!),
     enabled: !!batchId,
   })
 
-  const subBatches = isSubBatchesError
-    ? mockSubBatches.filter((sb) => sb.batchId === batchId)
-    : (subBatchData?.content ?? [])
+  const transactions: BatchTransaction[] = isTransactionsError
+    ? toRows(batchTransactionsByBatch[batchId ?? ''] ?? {})
+    : toRows(transactionsData ?? {})
 
   return (
     <div className="space-y-6">
@@ -97,7 +102,7 @@ export default function BatchDetail() {
         <StatCard label="Total Amount" value={formatAmount(batch?.totalAmount ?? null)} />
       </div>
 
-      {/* Batch info + Sub batches */}
+      {/* Batch info + Transactions */}
       <div className="flex gap-4 items-start">
         {/* Batch Info */}
         <Card className="flex-1 min-w-0">
@@ -114,13 +119,13 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Sub Batches */}
+        {/* Batch Transactions */}
         <Card className="flex-2 min-w-0">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-700">Sub Batches</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">Transactions</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {isSubBatchesError && (
+            {isTransactionsError && (
               <div className="px-6 pb-3 text-xs text-orange-700">
                 Could not reach the API — showing cached data.
               </div>
@@ -128,40 +133,32 @@ export default function BatchDetail() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Sub Batch ID</TableHead>
-                  <TableHead className="text-right">Transactions</TableHead>
-                  <TableHead className="text-right">Completed</TableHead>
-                  <TableHead className="text-right">Failed</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Transaction ID</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isSubBatchesLoading
+                {isTransactionsLoading
                   ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 6 }).map((__, j) => (
+                        {Array.from({ length: 2 }).map((__, j) => (
                           <TableCell key={j}>
                             <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
                           </TableCell>
                         ))}
                       </TableRow>
                     ))
-                  : subBatches.length > 0
-                    ? subBatches.map((sb) => (
-                        <TableRow key={sb.id}>
-                          <TableCell className="font-medium">{sb.subBatchId ?? '-'}</TableCell>
-                          <TableCell className="text-right">{sb.totalTransactions}</TableCell>
-                          <TableCell className="text-right">{sb.completed}</TableCell>
-                          <TableCell className="text-right">{sb.failed}</TableCell>
-                          <TableCell className="text-right">{formatAmount(sb.totalAmount)}</TableCell>
-                          <TableCell><StatusBadge status={sb.status} /></TableCell>
+                  : transactions.length > 0
+                    ? transactions.map((t) => (
+                        <TableRow key={t.transactionId}>
+                          <TableCell className="font-medium">{t.transactionId}</TableCell>
+                          <TableCell><StatusBadge status={t.status} /></TableCell>
                         </TableRow>
                       ))
                     : (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No sub batches found.
+                          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                            No transactions found.
                           </TableCell>
                         </TableRow>
                       )

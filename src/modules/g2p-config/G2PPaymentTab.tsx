@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { g2pConfigs } from './mocks/g2pConfigs.mock'
+import { useQuery } from '@tanstack/react-query'
+import { fetchG2PConfigs } from '@/lib/api/g2pConfig'
+import { g2pConfigs as mockConfigs } from './mocks/g2pConfigs.mock'
 import type { G2PConfig } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -32,13 +34,25 @@ type FilterChip = (typeof filterChips)[number]
 
 const statuses: G2PConfig['status'][] = ['Active', 'Inactive']
 
+const SKELETON_ROWS = 5
+
 export default function G2PPaymentTab() {
   const [activeChip, setActiveChip] = useState<FilterChip | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const filtered = g2pConfigs.filter(
+  const { data: apiData, isLoading, isError } = useQuery({
+    queryKey: ['g2pConfigs'],
+    queryFn: fetchG2PConfigs,
+    retry: false,
+  })
+
+  // Silently fall back to mock data if the API is unreachable (e.g. G2P
+  // service not deployed yet) — no error banner shown to the user.
+  const rows: G2PConfig[] = isError ? mockConfigs : (apiData ?? [])
+
+  const filtered = rows.filter(
     (c) => statusFilter === 'all' || c.status === statusFilter
   )
 
@@ -122,21 +136,31 @@ export default function G2PPaymentTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((config) => (
-              <TableRow key={config.paymentAccount}>
-                <TableCell>{config.governmentEntity}</TableCell>
-                <TableCell>{config.program}</TableCell>
-                <TableCell>{config.payerDFSP}</TableCell>
-                <TableCell className="font-medium">{config.paymentAccount}</TableCell>
-                <TableCell>
-                  <StatusBadge
-                    status={config.status === 'Inactive' ? 'Inactive-G2P' : config.status}
-                    label={config.status}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-            {paginated.length === 0 && (
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : paginated.map((config) => (
+                  <TableRow key={config.id ?? config.paymentAccount}>
+                    <TableCell>{config.governmentEntity}</TableCell>
+                    <TableCell>{config.program}</TableCell>
+                    <TableCell>{config.payerDFSP}</TableCell>
+                    <TableCell className="font-medium">{config.paymentAccount}</TableCell>
+                    <TableCell>
+                      <StatusBadge
+                        status={config.status === 'Inactive' ? 'Inactive-G2P' : config.status}
+                        label={config.status}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+            {!isLoading && paginated.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                   No records found.

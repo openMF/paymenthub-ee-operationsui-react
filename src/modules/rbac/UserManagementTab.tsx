@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { CheckCircle } from 'lucide-react'
+import { useToast } from '@/components/shared/ToastProvider'
 
 const ROLES: Role[] = ['Admin', 'Operator', 'Auditor']
 
@@ -37,29 +37,16 @@ const roleBadge: Record<Role, string> = {
   Auditor: 'bg-gray-100 text-gray-600',
 }
 
-interface Toast {
-  id: number
-  message: string
-}
-
-let toastId = 0
-
 export default function UserManagementTab() {
+  const { toast } = useToast()
   const [users, setUsers] = useState<RBACUser[]>(mockUsers)
   const [open, setOpen] = useState(false)
-  const [toasts, setToasts] = useState<Toast[]>([])
 
   // Add user form state
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [role, setRole] = useState<Role | ''>('')
-
-  function showToast(message: string) {
-    const id = ++toastId
-    setToasts((prev) => [...prev, { id, message }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2500)
-  }
 
   function handleCreateUser(e: React.FormEvent) {
     e.preventDefault()
@@ -77,11 +64,11 @@ export default function UserManagementTab() {
     setEmail('')
     setUsername('')
     setRole('')
-    showToast('User created successfully')
+    toast('User created successfully')
   }
 
   function handleAssignRole(id: string) {
-    showToast('Role assigned successfully')
+    toast('Role assigned successfully')
   }
 
   function handleToggleLock(id: string) {
@@ -92,28 +79,15 @@ export default function UserManagementTab() {
           : u
       )
     )
-    showToast('User status updated')
+    toast('User status updated')
   }
 
   function handleResetPassword(id: string) {
-    showToast('Password reset email sent')
+    toast('Password reset email sent')
   }
 
   return (
     <div className="space-y-4">
-      {/* Toast stack */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 shadow-md pointer-events-auto"
-          >
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            {t.message}
-          </div>
-        ))}
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-end">
         <Button
