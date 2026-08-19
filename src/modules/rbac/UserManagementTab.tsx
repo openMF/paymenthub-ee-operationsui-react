@@ -67,7 +67,7 @@ export default function UserManagementTab() {
     toast('User created successfully')
   }
 
-  function handleAssignRole(id: string) {
+  function handleAssignRole(_id: string) {
     toast('Role assigned successfully')
   }
 
@@ -82,7 +82,7 @@ export default function UserManagementTab() {
     toast('User status updated')
   }
 
-  function handleResetPassword(id: string) {
+  function handleResetPassword(_id: string) {
     toast('Password reset email sent')
   }
 

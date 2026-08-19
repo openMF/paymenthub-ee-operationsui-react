@@ -44,7 +44,7 @@ export default function MainBatchesTab() {
 
   // Fall back to mock data only when the API call fails
   const rows: MainBatch[] = isError ? mockBatches : (apiData?.data ?? [])
-  const totalCount: number = apiData?.totalBatches ?? rows.length
+  const totalCount: number = rows.length
 
   const filtered = rows.filter(
     (b) => statusFilter === 'all' || b.status === statusFilter

@@ -1,6 +1,7 @@
 import apiClient from './client'
+import type { MainBatch } from '@/modules/payment-hub/types'
 
-export const fetchMainBatches = async () => {
+export const fetchMainBatches = async (): Promise<{ data: MainBatch[] }> => {
   const response = await apiClient.get('/batches')
   return { data: response.data.data }
 }
