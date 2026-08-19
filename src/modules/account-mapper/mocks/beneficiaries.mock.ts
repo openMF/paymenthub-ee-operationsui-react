@@ -7,6 +7,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-FIN-001',
     financialAddress: 'rajesh.kumar@greenbank',
     paymentModality: '(04) Bank Account',
+    bbic: 'GRNBIN2026001',
   },
   {
     governmentEntity: 'Ministry of Education',
@@ -14,6 +15,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-EDU-002',
     financialAddress: 'priya.sharma@hdfc',
     paymentModality: '(04) Bank Account',
+    bbic: 'HDFCIN2026002',
   },
   {
     governmentEntity: 'Ministry of Health',
@@ -21,6 +23,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-HLT-003',
     financialAddress: '9876543210@digiwallet',
     paymentModality: '(03) Digital Wallet',
+    bbic: 'DGWLIN2026003',
   },
   {
     governmentEntity: 'Ministry of Rural Development',
@@ -28,6 +31,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-RD-004',
     financialAddress: 'anita.verma@bluebank',
     paymentModality: '(04) Bank Account',
+    bbic: 'BLUBIN2026004',
   },
   {
     governmentEntity: 'Ministry of Corporate Affairs',
@@ -35,6 +39,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-CA-005',
     financialAddress: 'suresh.nair@sbi',
     paymentModality: '(04) Bank Account',
+    bbic: 'SBIIIN2026005',
   },
   {
     governmentEntity: 'Ministry of Agriculture',
@@ -42,6 +47,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-AGR-006',
     financialAddress: '8765432109@redbank',
     paymentModality: '(01) Mobile Money',
+    bbic: 'REDBIN2026006',
   },
   {
     governmentEntity: 'Ministry of Health',
@@ -56,6 +62,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-EDU-008',
     financialAddress: '7654321098@digiwallet',
     paymentModality: '(03) Digital Wallet',
+    bbic: 'DGWLIN2026008',
   },
   {
     governmentEntity: 'Ministry of Finance',
@@ -63,6 +70,7 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-FIN-009',
     financialAddress: 'vikram.singh@sbi',
     paymentModality: '(04) Bank Account',
+    bbic: 'SBIIIN2026009',
   },
   {
     governmentEntity: 'Ministry of Rural Development',
@@ -70,5 +78,6 @@ export const beneficiaries: Beneficiary[] = [
     functionalId: 'BEN-RD-010',
     financialAddress: 'kavitha.rao@greenbank',
     paymentModality: '(01) Mobile Money',
+    bbic: 'GRNBIN2026010',
   },
 ]

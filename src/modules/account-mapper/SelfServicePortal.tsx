@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle, Loader2, Pencil } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ interface BeneficiaryData {
   financialInstitution: string
   financialAddress: string
   paymentModality: string
+  bbic: string
 }
 
 function findInMock(beneficiaryId: string): BeneficiaryData | null {
@@ -39,6 +40,7 @@ function findInMock(beneficiaryId: string): BeneficiaryData | null {
         financialInstitution: hit.financialInstitution,
         financialAddress: hit.financialAddress,
         paymentModality: hit.paymentModality,
+        bbic: hit.bbic ?? '',
       }
     : null
 }
@@ -47,9 +49,11 @@ export default function SelfServicePortal() {
   const [searchParams] = useSearchParams()
   const beneficiaryId = searchParams.get('beneficiaryId') ?? ''
 
+  const [isEditing, setIsEditing] = useState(false)
   const [financialInstitution, setFinancialInstitution] = useState('')
   const [financialAddress, setFinancialAddress] = useState('')
   const [paymentModality, setPaymentModality] = useState('')
+  const [bbic, setBbic] = useState('')
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -71,8 +75,18 @@ export default function SelfServicePortal() {
       setFinancialInstitution(beneficiary.financialInstitution)
       setFinancialAddress(beneficiary.financialAddress)
       setPaymentModality(beneficiary.paymentModality)
+      setBbic(beneficiary.bbic)
     }
   }, [beneficiary?.functionalId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function resetToLoaded() {
+    if (beneficiary) {
+      setFinancialInstitution(beneficiary.financialInstitution)
+      setFinancialAddress(beneficiary.financialAddress)
+      setPaymentModality(beneficiary.paymentModality)
+      setBbic(beneficiary.bbic)
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -80,10 +94,12 @@ export default function SelfServicePortal() {
         financialInstitution,
         financialAddress,
         paymentModality,
+        bbic,
       }),
     onSuccess: () => {
       setSuccessMsg('Your payment details have been updated successfully.')
       setErrorMsg('')
+      setIsEditing(false)
     },
     onError: () => {
       setErrorMsg('Failed to update details. Please try again.')
@@ -96,6 +112,12 @@ export default function SelfServicePortal() {
     setSuccessMsg('')
     setErrorMsg('')
     mutation.mutate()
+  }
+
+  function handleCancelEdit() {
+    resetToLoaded()
+    setIsEditing(false)
+    setErrorMsg('')
   }
 
   // ── States ─────────────────────────────────────────────────────────────
@@ -155,9 +177,23 @@ export default function SelfServicePortal() {
 
   return shell(
     <>
-      <div className="mb-6">
-        <h1 className="text-lg font-semibold text-gray-900">Update Payment Details</h1>
-        <p className="text-sm text-gray-500 mt-1">Review and update your financial account information below.</p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-gray-900">Update Payment Details</h1>
+          <p className="text-sm text-gray-500 mt-1">Review and update your financial account information below.</p>
+        </div>
+        {!isEditing && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0"
+            onClick={() => setIsEditing(true)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+        )}
       </div>
 
       {successMsg && (
@@ -174,7 +210,7 @@ export default function SelfServicePortal() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Read-only fields */}
+        {/* Always read-only fields */}
         <div className="space-y-1.5">
           <Label htmlFor="beneficiaryId">Beneficiary ID</Label>
           <Input
@@ -195,7 +231,7 @@ export default function SelfServicePortal() {
           />
         </div>
 
-        {/* Editable fields */}
+        {/* Editable fields — read-only until Edit is clicked */}
         <div className="space-y-1.5">
           <Label htmlFor="financialInstitution">Financial Institution</Label>
           <Input
@@ -203,7 +239,44 @@ export default function SelfServicePortal() {
             placeholder="Enter your bank or wallet provider"
             value={financialInstitution}
             onChange={(e) => setFinancialInstitution(e.target.value)}
+            readOnly={!isEditing}
+            className={!isEditing ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : undefined}
             required
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="paymentModality">Payment Modality</Label>
+          {isEditing ? (
+            <Select value={paymentModality} onValueChange={setPaymentModality} required>
+              <SelectTrigger id="paymentModality" className="w-full">
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_MODALITIES.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              id="paymentModality"
+              value={paymentModality}
+              readOnly
+              className="bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="bbic">Banking Institution Code (BBIC)</Label>
+          <Input
+            id="bbic"
+            placeholder="Enter your banking institution code"
+            value={bbic}
+            onChange={(e) => setBbic(e.target.value)}
+            readOnly={!isEditing}
+            className={!isEditing ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : undefined}
           />
         </div>
 
@@ -214,34 +287,35 @@ export default function SelfServicePortal() {
             placeholder="Account number, mobile number, or wallet ID"
             value={financialAddress}
             onChange={(e) => setFinancialAddress(e.target.value)}
+            readOnly={!isEditing}
+            className={!isEditing ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : undefined}
             required
           />
           <p className="text-xs text-gray-400">Your registered account number, mobile number, or wallet identifier.</p>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="paymentModality">Payment Modality</Label>
-          <Select value={paymentModality} onValueChange={setPaymentModality} required>
-            <SelectTrigger id="paymentModality" className="w-full">
-              <SelectValue placeholder="Select payment method" />
-            </SelectTrigger>
-            <SelectContent>
-              {PAYMENT_MODALITIES.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          type="submit"
-          disabled={mutation.isPending}
-          className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2"
-        >
-          {mutation.isPending
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Updating…</>
-            : 'Update Details'}
-        </Button>
+        {isEditing && (
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 bg-[#1565C0] hover:bg-[#0d47a1] text-white"
+            >
+              {mutation.isPending
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>
+                : 'Save'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={handleCancelEdit}
+              disabled={mutation.isPending}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
       </form>
     </>,
   )

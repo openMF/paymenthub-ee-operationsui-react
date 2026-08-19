@@ -6,9 +6,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { fetchMainBatches } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
 import { vouchers } from '@/modules/vouchers/mocks/vouchers.mock'
-import { g2pConfigs } from '@/modules/g2p-config/mocks/g2pConfigs.mock'
 
-const activeG2P = g2pConfigs.filter((c) => c.status === 'Active').length
 const recentVouchers = vouchers.slice(0, 5)
 
 function formatAmount(n: number) {
