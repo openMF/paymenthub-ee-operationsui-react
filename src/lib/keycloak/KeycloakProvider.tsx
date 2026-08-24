@@ -1,17 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import keycloak from './keycloak'
+import keycloak, { decodeJwtPayload } from './keycloak'
 import { useToast } from '@/components/shared/ToastProvider'
 
 const EXPIRY_CHECK_INTERVAL_MS = 60_000
 const EXPIRY_WARNING_THRESHOLD_MS = 120_000
-
-function decodeJwtPayload(token: string) {
-  const base64Url = token.split('.')[1]
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-  const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
-  return JSON.parse(atob(padded))
-}
 
 interface KeycloakContextValue {
   keycloak: typeof keycloak

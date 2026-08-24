@@ -150,6 +150,25 @@ Copy `.env.example` to `.env.development` (normal dev) or `.env.g2p` (G2P mock t
 
 ## Keycloak Setup (Local Docker)
 
+### Quick Setup (Recommended) — Import Realm
+
+If you have the realm export file, start Keycloak with realm pre-loaded:
+
+```powershell
+docker run -p 8180:8080 \
+  -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
+  -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+  -v /absolute/path/to/docs/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json \
+  quay.io/keycloak/keycloak:latest \
+  start-dev --import-realm
+```
+
+Replace `/absolute/path/to/` with your local path.
+
+This skips manual realm/client setup entirely — see [docs/keycloak/README.md](docs/keycloak/README.md) for what the export contains and the test user you still need to create.
+
+### Manual Setup
+
 Run Keycloak locally on port 8180:
 
 ```bash
@@ -168,6 +187,8 @@ Then configure at `http://localhost:8180`:
    - **Valid redirect URIs:** `http://localhost:5173/*`
    - **Web origins:** `http://localhost:5173`
 3. Create a test user and set credentials
+
+### Environment Variables
 
 Update `.env.development` (or `.env.g2p` if using G2P mock mode):
 
