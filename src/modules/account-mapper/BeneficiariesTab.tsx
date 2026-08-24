@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { beneficiaries } from './mocks/beneficiaries.mock'
+import { useQuery } from '@tanstack/react-query'
+import { fetchBeneficiaries } from '@/lib/api/accountMapper'
+import { beneficiaries as mockBeneficiaries } from './mocks/beneficiaries.mock'
+import type { Beneficiary } from './types'
 import {
   Table,
   TableBody,
@@ -25,9 +28,20 @@ const filterChips = [
   'Financial Address',
 ] as const
 
+const SKELETON_ROWS = 5
+
 export default function BeneficiariesTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['beneficiaries'],
+    queryFn: fetchBeneficiaries,
+  })
+
+  // Silently falls back to mock data when the response has no content
+  const beneficiaries: Beneficiary[] = data?.content?.length ? data.content : mockBeneficiaries
+  const totalCount: number = data?.totalElements ?? beneficiaries.length
 
   const totalPages = Math.max(1, Math.ceil(beneficiaries.length / perPage))
   const paginated = beneficiaries.slice((page - 1) * perPage, page * perPage)
@@ -60,22 +74,34 @@ export default function BeneficiariesTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((b) => (
-              <TableRow key={b.functionalId}>
-                <TableCell>{b.governmentEntity}</TableCell>
-                <TableCell>{b.financialInstitution}</TableCell>
-                <TableCell className="font-medium">{b.functionalId}</TableCell>
-                <TableCell>{b.financialAddress}</TableCell>
-                <TableCell>{b.paymentModality}</TableCell>
-              </TableRow>
-            ))}
-            {paginated.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  No records found.
-                </TableCell>
-              </TableRow>
-            )}
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : paginated.length > 0
+                ? paginated.map((b) => (
+                    <TableRow key={b.functionalId}>
+                      <TableCell>{b.governmentEntity}</TableCell>
+                      <TableCell>{b.financialInstitution}</TableCell>
+                      <TableCell className="font-medium">{b.functionalId}</TableCell>
+                      <TableCell>{b.financialAddress}</TableCell>
+                      <TableCell>{b.paymentModality}</TableCell>
+                    </TableRow>
+                  ))
+                : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  )
+            }
           </TableBody>
         </Table>
 
@@ -102,9 +128,9 @@ export default function BeneficiariesTab() {
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              {beneficiaries.length === 0
+              {totalCount === 0
                 ? '0–0 of 0'
-                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, beneficiaries.length)} of ${beneficiaries.length}`}
+                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, beneficiaries.length)} of ${totalCount}`}
             </span>
             <Button
               variant="outline"

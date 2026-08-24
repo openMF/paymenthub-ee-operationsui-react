@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { vouchers } from './mocks/vouchers.mock'
+import { useQuery } from '@tanstack/react-query'
+import { fetchVouchers } from '@/lib/api/vouchers'
+import { vouchers as mockVouchers } from './mocks/vouchers.mock'
 import type { Voucher } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -39,13 +41,23 @@ const statuses: Voucher['status'][] = [
   'Suspended',
 ]
 
+const SKELETON_ROWS = 5
+
 export default function VouchersTab() {
   const [activeChip, setActiveChip] = useState<FilterChip | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const filtered = vouchers.filter(
+  const { data, isLoading } = useQuery({
+    queryKey: ['vouchers'],
+    queryFn: fetchVouchers,
+  })
+
+  // Fall back to mock data if the response has no content
+  const rows: Voucher[] = data?.content?.length ? data.content : mockVouchers
+
+  const filtered = rows.filter(
     (v) => statusFilter === 'all' || v.status === statusFilter
   )
 
@@ -129,24 +141,36 @@ export default function VouchersTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((voucher) => (
-              <TableRow key={voucher.serialNumber}>
-                <TableCell className="font-medium">{voucher.serialNumber}</TableCell>
-                <TableCell>{voucher.dateVoucherCreated}</TableCell>
-                <TableCell>{voucher.governmentEntity}</TableCell>
-                <TableCell>{voucher.functionalId}</TableCell>
-                <TableCell>
-                  <StatusBadge status={voucher.status} />
-                </TableCell>
-              </TableRow>
-            ))}
-            {paginated.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  No records found.
-                </TableCell>
-              </TableRow>
-            )}
+            {isLoading
+              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 5 }).map((__, j) => (
+                      <TableCell key={j}>
+                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : paginated.length > 0
+                ? paginated.map((voucher) => (
+                    <TableRow key={voucher.serialNumber}>
+                      <TableCell className="font-medium">{voucher.serialNumber}</TableCell>
+                      <TableCell>{voucher.dateVoucherCreated}</TableCell>
+                      <TableCell>{voucher.governmentEntity}</TableCell>
+                      <TableCell>{voucher.functionalId}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={voucher.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        No records found.
+                      </TableCell>
+                    </TableRow>
+                  )
+            }
           </TableBody>
         </Table>
 
