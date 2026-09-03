@@ -1,9 +1,10 @@
 import Keycloak from 'keycloak-js'
+import { getEnv } from '@/lib/runtime-config'
 
 const keycloak = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL,
-  realm: import.meta.env.VITE_KEYCLOAK_REALM,
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
+  url: getEnv('VITE_KEYCLOAK_URL') ?? '',
+  realm: getEnv('VITE_KEYCLOAK_REALM') ?? '',
+  clientId: getEnv('VITE_KEYCLOAK_CLIENT_ID') ?? '',
 })
 
 export function decodeJwtPayload(token: string) {

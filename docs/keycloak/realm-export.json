@@ -721,10 +721,12 @@
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "http://localhost:5173/*"
+        "http://localhost:5173/*",
+        "https://ops.mifos.gazelle.test/*"
       ],
       "webOrigins": [
-        "http://localhost:5173"
+        "http://localhost:5173",
+        "https://ops.mifos.gazelle.test"
       ],
       "notBefore": 0,
       "bearerOnly": false,

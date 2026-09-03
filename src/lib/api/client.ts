@@ -1,7 +1,8 @@
 import axios from 'axios'
+import { getEnv } from '@/lib/runtime-config'
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: getEnv('VITE_API_BASE_URL'),
 })
 
 apiClient.interceptors.request.use((config) => {

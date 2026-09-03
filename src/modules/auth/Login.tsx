@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { getEnv } from '@/lib/runtime-config'
 
 const TENANTS = ['greenbank', 'bluebank', 'redbank']
 
@@ -32,13 +33,13 @@ export default function Login() {
 
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM}/protocol/openid-connect/token`,
+        `${getEnv('VITE_KEYCLOAK_URL')}/realms/${getEnv('VITE_KEYCLOAK_REALM')}/protocol/openid-connect/token`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
             grant_type: 'password',
-            client_id: import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
+            client_id: getEnv('VITE_KEYCLOAK_CLIENT_ID') ?? '',
             username,
             password,
           }),
