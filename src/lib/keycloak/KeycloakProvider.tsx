@@ -96,6 +96,9 @@ export default function KeycloakProvider({ children }: { children: ReactNode }) 
               token: existingToken,
               refreshToken: existingRefreshToken ?? undefined,
               idToken: existingIdToken ?? undefined,
+              // ROPC creates no Keycloak browser session, so the status
+              // iframe would report "changed" and drop these tokens.
+              checkLoginIframe: false,
             })
             .then((auth) => {
               setAuthenticated(auth)

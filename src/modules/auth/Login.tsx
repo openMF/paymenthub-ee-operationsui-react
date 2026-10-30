@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { User, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -14,7 +13,7 @@ import {
 } from '@/components/ui/select'
 import { getEnv } from '@/lib/runtime-config'
 import { useToast } from '@/components/shared/ToastProvider'
-import keycloak, { persistTokens } from '@/lib/keycloak/keycloak'
+import { persistTokens } from '@/lib/keycloak/keycloak'
 
 const TENANTS = ['greenbank', 'bluebank', 'redbank']
 
@@ -24,7 +23,6 @@ const LOGOUT_REASON_MESSAGES: Record<string, string> = {
 }
 
 export default function Login() {
-  const navigate = useNavigate()
   const { toast } = useToast()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -67,18 +65,19 @@ export default function Login() {
       )
       const data = await response.json()
       if (data.access_token) {
-        // Hand the ROPC tokens to the shared keycloak-js instance so its own
-        // updateToken()/logout() have a real refresh/id token to work with —
-        // without this, keycloak.token stays undefined forever and silent
-        // refresh has nothing to refresh.
-        await keycloak.init({
+        // Persist the ROPC tokens and do a full page load: KeycloakProvider's
+        // stored-token path then init()s the shared keycloak-js instance with
+        // them. Calling keycloak.init() here instead throws whenever the
+        // provider already initialised the instance (any redirect to /login
+        // from a protected route), which surfaced as "Unable to reach
+        // authentication server" despite a successful token response.
+        persistTokens({
           token: data.access_token,
           refreshToken: data.refresh_token,
           idToken: data.id_token,
         })
-        persistTokens(keycloak)
         localStorage.setItem('tenant', tenant)
-        navigate('/')
+        window.location.assign('/')
       } else {
         setError('Invalid username or password')
       }
