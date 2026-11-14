@@ -21,6 +21,7 @@ interface Props {
   onSuccess: () => void
 }
 
+// GovStack spec 7.1: the BBIC is present for a bank account, mobile money and a digital wallet
 const MODALITIES_REQUIRING_BBIC: PaymentModalityCode[] = ['00', '01', '03']
 
 const emptyEntry: BeneficiaryEntry = {
@@ -227,7 +228,7 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
                   onChange={(e) => setEntryField(index, 'bbic', e.target.value)}
                 />
                 <p className="text-xs text-gray-400">
-                  Required for Account ID, MSISDN and Wallet ID
+                  Required for Bank Account, Mobile Money and Digital Wallet
                 </p>
               </div>
 

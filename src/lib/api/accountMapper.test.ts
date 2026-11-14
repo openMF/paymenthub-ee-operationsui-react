@@ -32,12 +32,25 @@ describe('accountMapper', () => {
       financialInstitution: 'bluebank',
       functionalId: '0495822412',
       financialAddress: '12',
-      paymentModality: '00 - Account ID',
+      paymentModality: '00 - Bank Account',
     })
   })
 
   it('labels the modality account-mapper reads back without its leading zero', () => {
-    expect(toBeneficiary({ ...record, paymentModality: '1' }).paymentModality).toBe('01 - MSISDN')
+    expect(toBeneficiary({ ...record, paymentModality: '1' }).paymentModality).toBe('01 - Mobile Money')
+  })
+
+  it('labels every modality code as the GovStack spec (section 7.1) defines it', () => {
+    const labels = ['00', '01', '02', '03', '04'].map(
+      (code) => toBeneficiary({ ...record, paymentModality: code }).paymentModality,
+    )
+    expect(labels).toEqual([
+      '00 - Bank Account',
+      '01 - Mobile Money',
+      '02 - Voucher',
+      '03 - Digital Wallet',
+      '04 - Proxy',
+    ])
   })
 
   it('passes paging through and uses the server totals', async () => {
