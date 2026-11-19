@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { fetchBeneficiaries } from '@/lib/api/accountMapper'
-import { beneficiaries as mockBeneficiaries } from './mocks/beneficiaries.mock'
 import type { Beneficiary } from './types'
 import {
   Table,
@@ -22,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 const filterChips = [
-  'Government Entity',
+  'Registering Institution',
   'Financial Institution',
   'Functional ID',
   'Financial Address',
@@ -34,17 +33,16 @@ export default function BeneficiariesTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['beneficiaries'],
-    queryFn: fetchBeneficiaries,
+  // account-mapper pages from 0, this screen from 1
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['beneficiaries', page, perPage],
+    queryFn: () => fetchBeneficiaries(page - 1, perPage),
+    placeholderData: keepPreviousData,
   })
 
-  // Silently falls back to mock data when the response has no content
-  const beneficiaries: Beneficiary[] = data?.content?.length ? data.content : mockBeneficiaries
-  const totalCount: number = data?.totalElements ?? beneficiaries.length
-
-  const totalPages = Math.max(1, Math.ceil(beneficiaries.length / perPage))
-  const paginated = beneficiaries.slice((page - 1) * perPage, page * perPage)
+  const paginated: Beneficiary[] = data?.content ?? []
+  const totalCount: number = data?.totalElements ?? 0
+  const totalPages = Math.max(1, data?.totalPages ?? 1)
 
   return (
     <div className="space-y-4">
@@ -66,7 +64,7 @@ export default function BeneficiariesTab() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Government Entity</TableHead>
+              <TableHead>Registering Institution</TableHead>
               <TableHead>Financial Institution</TableHead>
               <TableHead>Functional ID</TableHead>
               <TableHead>Financial Address</TableHead>
@@ -84,7 +82,15 @@ export default function BeneficiariesTab() {
                     ))}
                   </TableRow>
                 ))
-              : paginated.length > 0
+              : isError
+                ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-red-600 py-8">
+                        Could not load beneficiaries: {error instanceof Error ? error.message : String(error)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                : paginated.length > 0
                 ? paginated.map((b) => (
                     <TableRow key={b.functionalId}>
                       <TableCell>{b.governmentEntity}</TableCell>
@@ -130,7 +136,7 @@ export default function BeneficiariesTab() {
             <span>
               {totalCount === 0
                 ? '0–0 of 0'
-                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, beneficiaries.length)} of ${totalCount}`}
+                : `${(page - 1) * perPage + 1}–${(page - 1) * perPage + paginated.length} of ${totalCount}`}
             </span>
             <Button
               variant="outline"

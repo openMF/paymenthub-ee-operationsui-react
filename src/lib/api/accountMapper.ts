@@ -1,26 +1,94 @@
-// Account Mapper API — endpoint available on Gazelle but returning 500
-// Real endpoints:
-// GET  /api/v1/beneficiaries  — list beneficiaries
-// POST /identityAccountMapper/beneficiary  — register beneficiary
-// PUT  /identityAccountMapper/beneficiary  — update beneficiary
-// GET  /identityAccountMapper/beneficiary/{id}  — lookup beneficiary
-// Wire up when Ruphine confirms endpoints are fully configured on Gazelle
+// Account Mapper API: the BFF's /api/v1/beneficiaries, which proxies to
+// paymenthub-ee-account-mapper for the logged-in tenant (PHEE-469).
+//
+// lookupBeneficiary and updateBeneficiary serve only the public Self Service
+// Portal, which has no login and so no tenant; they are not wired to the BFF.
 
+import axios from 'axios'
 import apiClient from './client'
-import type { BeneficiaryEntry, ApiConfig } from '@/modules/account-mapper/types'
+import type { Beneficiary, BeneficiaryEntry } from '@/modules/account-mapper/types'
+import { paymentModalityLabel } from '@/modules/account-mapper/types'
 import { beneficiaries as beneficiariesMock } from '@/modules/account-mapper/mocks/beneficiaries.mock'
 
-export const fetchBeneficiaries = async () => {
-  try {
-    const response = await apiClient.get('/beneficiaries')
-    return response.data
-  } catch {
-    // Fallback to mock data — backend returning 500 on Gazelle
-    return {
-      content: beneficiariesMock,
-      totalElements: beneficiariesMock.length,
+/** A beneficiary as account-mapper returns it. */
+interface AccountMapperRecord {
+  registeringInstitutionId: string
+  payeeIdentity: string
+  paymentModality: string | null
+  financialAddress: string | null
+  bankingInstitutionCode: string | null
+}
+
+export interface BeneficiaryPage {
+  content: Beneficiary[]
+  totalElements: number
+  totalPages: number
+}
+
+export function toBeneficiary(record: AccountMapperRecord): Beneficiary {
+  return {
+    governmentEntity: record.registeringInstitutionId,
+    financialInstitution: record.bankingInstitutionCode ?? '',
+    functionalId: record.payeeIdentity,
+    financialAddress: record.financialAddress ?? '',
+    paymentModality: paymentModalityLabel(record.paymentModality),
+  }
+}
+
+/** page is 0-based, as in account-mapper. */
+export const fetchBeneficiaries = async (page: number, pageSize: number): Promise<BeneficiaryPage> => {
+  const response = await apiClient.get('/beneficiaries', { params: { page, pageSize } })
+  const records: AccountMapperRecord[] = response.data?.content ?? []
+  return {
+    content: records.map(toBeneficiary),
+    totalElements: response.data?.totalElements ?? records.length,
+    totalPages: response.data?.totalPages ?? 1,
+  }
+}
+
+export interface SubmitResult {
+  succeeded: string[]
+  failed: { payeeIdentity: string; message: string }[]
+}
+
+function errorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message
+    if (typeof message === 'string' && message) return message
+    if (error.response) return `HTTP ${error.response.status}`
+  }
+  return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Registers (POST) or updates (PUT) each beneficiary in turn. The BFF answers
+ * only once account-mapper has stored the record, so a failure here is real:
+ * already registered, unknown payee, or rejected by account-mapper.
+ */
+export const submitBeneficiaries = async (
+  mode: 'register' | 'update',
+  beneficiaries: BeneficiaryEntry[],
+): Promise<SubmitResult> => {
+  const result: SubmitResult = { succeeded: [], failed: [] }
+  for (const entry of beneficiaries) {
+    const body = {
+      payeeIdentity: entry.payeeIdentity,
+      paymentModality: entry.paymentModality,
+      financialAddress: entry.financialAddress,
+      bankingInstitutionCode: entry.bbic || null,
+    }
+    try {
+      if (mode === 'register') {
+        await apiClient.post('/beneficiaries', body)
+      } else {
+        await apiClient.put('/beneficiaries', body)
+      }
+      result.succeeded.push(entry.payeeIdentity)
+    } catch (error) {
+      result.failed.push({ payeeIdentity: entry.payeeIdentity, message: errorMessage(error) })
     }
   }
+  return result
 }
 
 export const lookupBeneficiary = async (beneficiaryId: string) => {
@@ -45,18 +113,4 @@ export const updateBeneficiary = async (
   } catch {
     return { responseCode: '00', responseDescription: 'Update successful' }
   }
-}
-
-// No backend endpoint deployed yet for bulk register/update — logs the
-// request shape so operators can verify the payload, then resolves as if
-// the call succeeded.
-export const submitBeneficiaries = async (
-  mode: 'register' | 'update',
-  beneficiaries: BeneficiaryEntry[],
-  config: ApiConfig,
-) => {
-  const payload = { mode, beneficiaries, config }
-  console.log(`[mock] ${mode === 'register' ? 'POST' : 'PUT'} /identityAccountMapper/beneficiary`, payload)
-  await new Promise((resolve) => setTimeout(resolve, 800))
-  return { message: `${beneficiaries.length} beneficiary(ies) ${mode === 'register' ? 'registered' : 'updated'} successfully` }
 }

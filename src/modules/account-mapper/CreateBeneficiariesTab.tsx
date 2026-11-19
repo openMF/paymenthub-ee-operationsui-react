@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -9,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle, AlertCircle, ChevronDown, Plus, X } from 'lucide-react'
+import { CheckCircle, AlertCircle, Plus, X } from 'lucide-react'
 import { submitBeneficiaries } from '@/lib/api/accountMapper'
-import { PAYMENT_MODALITY_CODES, type BeneficiaryEntry, type ApiConfig, type PaymentModalityCode } from './types'
+import { PAYMENT_MODALITY_CODES, type BeneficiaryEntry, type PaymentModalityCode } from './types'
 
 type Mode = 'register' | 'update'
 
@@ -20,6 +21,7 @@ interface Props {
   onSuccess: () => void
 }
 
+// GovStack spec 7.1: the BBIC is present for a bank account, mobile money and a digital wallet
 const MODALITIES_REQUIRING_BBIC: PaymentModalityCode[] = ['00', '01', '03']
 
 const emptyEntry: BeneficiaryEntry = {
@@ -27,20 +29,12 @@ const emptyEntry: BeneficiaryEntry = {
   paymentModality: '',
   bbic: '',
   financialAddress: '',
-  sourceBbId: '',
-}
-
-const emptyConfig: ApiConfig = {
-  apiUrl: '',
-  callbackUrl: '',
-  registeringInstitutionId: '',
 }
 
 export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
   const [mode, setMode] = useState<Mode>('register')
+  const queryClient = useQueryClient()
   const [entries, setEntries] = useState<BeneficiaryEntry[]>([{ ...emptyEntry }])
-  const [config, setConfig] = useState<ApiConfig>({ ...emptyConfig })
-  const [configOpen, setConfigOpen] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -72,9 +66,6 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
       if (!entry.payeeIdentity || !entry.paymentModality || !entry.financialAddress) {
         return 'Please fill in all required fields'
       }
-      if (mode === 'update' && !entry.sourceBbId) {
-        return 'Source BB ID is required in update mode'
-      }
       const bbicRequired = MODALITIES_REQUIRING_BBIC.includes(entry.paymentModality)
       if (bbicRequired && !entry.bbic) {
         return 'Banking Institution Code (BBIC) is required for the selected payment modality'
@@ -95,15 +86,24 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
     setError(null)
     setSubmitting(true)
     try {
-      await submitBeneficiaries(mode, entries, config)
+      const result = await submitBeneficiaries(mode, entries)
+      if (result.succeeded.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['beneficiaries'] })
+      }
+      if (result.failed.length > 0) {
+        // keep only the beneficiaries that failed, so they can be corrected and resubmitted
+        const failedIds = new Set(result.failed.map((f) => f.payeeIdentity))
+        setEntries((prev) => prev.filter((entry) => failedIds.has(entry.payeeIdentity)))
+        const done = result.succeeded.length > 0 ? `${result.succeeded.length} saved. ` : ''
+        setError(`${done}Failed: ${result.failed.map((f) => `${f.payeeIdentity} (${f.message})`).join('; ')}`)
+        return
+      }
       setSuccess(true)
       setEntries([{ ...emptyEntry }])
       setTimeout(() => {
         setSuccess(false)
         onSuccess()
       }, 1500)
-    } catch {
-      setError('Failed to submit. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -228,7 +228,7 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
                   onChange={(e) => setEntryField(index, 'bbic', e.target.value)}
                 />
                 <p className="text-xs text-gray-400">
-                  Required for bank account, mobile money, and digital wallet
+                  Required for Bank Account, Mobile Money and Digital Wallet
                 </p>
               </div>
 
@@ -244,19 +244,6 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
                 />
                 <p className="text-xs text-gray-400">IBAN, phone number, or wallet address</p>
               </div>
-
-              {mode === 'update' && (
-                <div className="space-y-1.5">
-                  <Label htmlFor={`sourceBbId-${index}`}>Source BB ID</Label>
-                  <Input
-                    id={`sourceBbId-${index}`}
-                    placeholder="Enter source BB ID"
-                    value={entry.sourceBbId}
-                    onChange={(e) => setEntryField(index, 'sourceBbId', e.target.value)}
-                    required
-                  />
-                </div>
-              )}
             </div>
           ))}
 
@@ -269,53 +256,6 @@ export default function CreateBeneficiariesTab({ onCancel, onSuccess }: Props) {
             <Plus className="h-4 w-4" />
             Add Another Beneficiary
           </Button>
-
-          {/* API config (collapsible) */}
-          <div className="rounded-lg border border-gray-200 bg-white">
-            <button
-              type="button"
-              onClick={() => setConfigOpen((v) => !v)}
-              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-gray-700"
-            >
-              API Configuration
-              <ChevronDown
-                className={`h-4 w-4 text-gray-400 transition-transform ${configOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
-            {configOpen && (
-              <div className="space-y-4 border-t border-gray-100 px-4 py-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="apiUrl">API URL</Label>
-                  <Input
-                    id="apiUrl"
-                    placeholder="https://..."
-                    value={config.apiUrl}
-                    onChange={(e) => setConfig((prev) => ({ ...prev, apiUrl: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="callbackUrl">Callback URL</Label>
-                  <Input
-                    id="callbackUrl"
-                    placeholder="https://..."
-                    value={config.callbackUrl}
-                    onChange={(e) => setConfig((prev) => ({ ...prev, callbackUrl: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="registeringInstitutionId">Registering Institution ID</Label>
-                  <Input
-                    id="registeringInstitutionId"
-                    placeholder="Enter institution ID"
-                    value={config.registeringInstitutionId}
-                    onChange={(e) =>
-                      setConfig((prev) => ({ ...prev, registeringInstitutionId: e.target.value }))
-                    }
-                  />
-                </div>
-              </div>
-            )}
-          </div>
 
           <div className="flex flex-col gap-2 pt-2">
             <Button
