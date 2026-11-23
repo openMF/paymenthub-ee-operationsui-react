@@ -6,14 +6,9 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { fetchMainBatches } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
 import { vouchers } from '@/modules/vouchers/mocks/vouchers.mock'
+import { formatAmount } from '@/lib/formatAmount'
 
 const recentVouchers = vouchers.slice(0, 5)
-
-function formatAmount(n: number) {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
-  return `$${n}`
-}
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -28,9 +23,7 @@ export default function Dashboard() {
 
   const totalBatches = batches.length
   const totalTransactions = batches.reduce((sum, b) => sum + b.totalTransactions, 0)
-  const totalAmount = Math.abs(
-    batches.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0) / 100
-  ).toLocaleString()
+  const totalAmount = formatAmount(batches.reduce((sum, b) => sum + (b.totalAmount ?? 0), 0))
   const completedBatches = batches.filter((b) => b.status === 'COMPLETED').length
 
   return (
@@ -59,7 +52,7 @@ export default function Dashboard() {
         />
         <StatCard
           label="Total Amount Disbursed"
-          value={`$${totalAmount}`}
+          value={totalAmount}
           subtitle="Payment Hub"
           icon={<Users size={20} className="text-white" />}
           iconBg="bg-orange-500"
@@ -116,7 +109,7 @@ export default function Dashboard() {
                         <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.batchId}</td>
                         <td className="px-6 py-3 text-gray-600">{b.startedAt ? new Date(b.startedAt).toLocaleString() : '-'}</td>
                         <td className="px-6 py-3 text-gray-600">{b.completedAt ? new Date(b.completedAt).toLocaleString() : '-'}</td>
-                        <td className="px-6 py-3 text-right text-gray-700 font-medium">{formatAmount(b.totalAmount ?? 0)}</td>
+                        <td className="px-6 py-3 text-right text-gray-700 font-medium">{formatAmount(b.totalAmount)}</td>
                         <td className="px-6 py-3">
                           <StatusBadge status={b.status ?? 'Unknown'} />
                         </td>

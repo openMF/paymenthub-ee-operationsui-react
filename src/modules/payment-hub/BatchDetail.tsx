@@ -11,13 +11,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { formatAmount } from '@/lib/formatAmount'
 
 const SKELETON_ROWS = 5
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
-}
 
 const formatDate = (ts: number | null) => (ts ? new Date(ts).toLocaleString() : '-')
 

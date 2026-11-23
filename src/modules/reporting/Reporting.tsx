@@ -20,6 +20,7 @@ import { fetchMainBatches, fetchTransfers } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
 import { transfers as mockTransfers } from '@/modules/payment-hub/mocks/transfers.mock'
 import type { MainBatch } from '@/modules/payment-hub/types'
+import { formatAmount } from '@/lib/formatAmount'
 
 // ── Mock data (fallback for charts with no real endpoint yet) ──────────────
 
@@ -46,11 +47,6 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: '#22c55e',
   IN_PROGRESS: '#f97316',
   FAILED: '#ef4444',
-}
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
 }
 
 function buildStatusBreakdown(batches: MainBatch[]) {
@@ -180,7 +176,7 @@ export default function Reporting() {
       {/* Row 1 — KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard label="Total Transactions" value={totalTransactions.toLocaleString()} trend="up" isLoading={isBatchesLoading} />
-        <KpiCard label="Total Amount Disbursed" value={`$${totalAmount}`} trend="up" isLoading={isBatchesLoading} />
+        <KpiCard label="Total Amount Disbursed" value={totalAmount} trend="up" isLoading={isBatchesLoading} />
         <KpiCard label="Success Rate" value={`${successRate}%`} trend="up" isLoading={isBatchesLoading} />
         <KpiCard label="Failure Rate" value={`${failureRate}%`} trend="down" isLoading={isBatchesLoading} />
       </div>

@@ -14,15 +14,11 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
+import { formatAmount } from '@/lib/formatAmount'
 
 const STATUSES = ['COMPLETED', 'IN_PROGRESS', 'FAILED']
 const SKELETON_ROWS = 5
 
-const formatAmount = (amount: string | null) => {
-  const n = amount ? Number(amount) : 0
-  if (!n) return '0'
-  return Math.abs(n / 100).toLocaleString()
-}
 
 const formatField = (value: string | null) =>
   !value || value === 'null' ? '-' : value
@@ -56,7 +52,7 @@ export default function TransfersTab() {
     'Start Time': t.startedAt ? new Date(t.startedAt).toLocaleString() : '-',
     'Completed Time': t.completedAt ? new Date(t.completedAt).toLocaleString() : '-',
     'Batch ID': formatField(t.batchId),
-    Amount: formatAmount(t.amount),
+    Amount: formatAmount(t.amount, t.currency),
     'Payer FSP': formatField(t.payerDfspId),
     Status: t.status ?? 'Unknown',
   }))
@@ -111,7 +107,7 @@ export default function TransfersTab() {
             onClick={() => exportPdf(
               'Transfers',
               ['Transaction ID', 'Start Time', 'Completed Time', 'Batch ID', 'Amount', 'Payer FSP', 'Status'],
-              filtered.map((t) => [t.transactionId, t.startedAt ? new Date(t.startedAt).toLocaleString() : '-', t.completedAt ? new Date(t.completedAt).toLocaleString() : '-', formatField(t.batchId), formatAmount(t.amount), formatField(t.payerDfspId), t.status ?? 'Unknown']),
+              filtered.map((t) => [t.transactionId, t.startedAt ? new Date(t.startedAt).toLocaleString() : '-', t.completedAt ? new Date(t.completedAt).toLocaleString() : '-', formatField(t.batchId), formatAmount(t.amount, t.currency), formatField(t.payerDfspId), t.status ?? 'Unknown']),
               `transfers-${csvDate()}.pdf`,
             )}
           >
@@ -160,7 +156,7 @@ export default function TransfersTab() {
                       <TableCell>{transfer.startedAt ? new Date(transfer.startedAt).toLocaleString() : '-'}</TableCell>
                       <TableCell>{transfer.completedAt ? new Date(transfer.completedAt).toLocaleString() : '-'}</TableCell>
                       <TableCell>{formatField(transfer.batchId)}</TableCell>
-                      <TableCell className="text-right">{formatAmount(transfer.amount)}</TableCell>
+                      <TableCell className="text-right">{formatAmount(transfer.amount, transfer.currency)}</TableCell>
                       <TableCell>{formatField(transfer.payerDfspId)}</TableCell>
                       <TableCell><StatusBadge status={transfer.status} /></TableCell>
                     </TableRow>

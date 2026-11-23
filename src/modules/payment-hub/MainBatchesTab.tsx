@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
+import { formatAmount } from '@/lib/formatAmount'
 
 const STATUSES = [
   { label: 'Completed', value: 'COMPLETED' },
@@ -22,11 +23,6 @@ const STATUSES = [
   { label: 'Rejected', value: 'FAILED' },
 ]
 const SKELETON_ROWS = 5
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
-}
 
 const formatInstitutionId = (id: string | null) =>
   !id || id === 'null' ? '-' : id
