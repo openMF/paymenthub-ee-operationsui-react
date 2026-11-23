@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
-import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
-import { batchTransactionsByBatch } from './mocks/batchTransactions.mock'
 import type { MainBatch, BatchTransaction } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -21,7 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import LoadError from '@/components/shared/LoadError'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 
@@ -35,12 +34,12 @@ export default function SubBatchesTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data: mainBatchesData, isError: isBatchesError } = useQuery({
+  const { data: mainBatchesData, isError: isBatchesError, error: batchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batchOptions: MainBatch[] = isBatchesError ? mockBatches : (mainBatchesData?.data ?? [])
+  const batchOptions: MainBatch[] = mainBatchesData?.data ?? []
   const [batchId, setBatchId] = useState<string>('')
 
   useEffect(() => {
@@ -49,15 +48,13 @@ export default function SubBatchesTab() {
     }
   }, [batchId, batchOptions])
 
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['batchTransactions', batchId],
     queryFn: () => fetchBatchTransactions(batchId),
     enabled: !!batchId,
   })
 
-  const rows: BatchTransaction[] = isError
-    ? toRows(batchTransactionsByBatch[batchId] ?? {})
-    : toRows(apiData ?? {})
+  const rows: BatchTransaction[] = toRows(apiData ?? {})
 
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
   const paginated = rows.slice((page - 1) * perPage, page * perPage)
@@ -113,12 +110,8 @@ export default function SubBatchesTab() {
       </div>
 
       {/* Error banner */}
-      {isError && (
-        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-          <AlertCircle size={15} className="shrink-0" />
-          Could not reach the API — showing cached data.
-        </div>
-      )}
+      {isBatchesError && <LoadError what="batches" error={batchesError} />}
+      {isError && <LoadError what="the batch's transactions" error={error} />}
 
       {/* Table */}
       <div className="rounded-lg border bg-white">
@@ -150,7 +143,7 @@ export default function SubBatchesTab() {
                 : (
                     <TableRow>
                       <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
-                        No records found.
+                        {isError || isBatchesError ? 'No transactions loaded.' : 'No records found.'}
                       </TableCell>
                     </TableRow>
                   )

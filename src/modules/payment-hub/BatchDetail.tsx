@@ -2,10 +2,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
-import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
-import { batchTransactionsByBatch } from './mocks/batchTransactions.mock'
 import type { BatchTransaction } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
+import LoadError from '@/components/shared/LoadError'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -47,23 +46,21 @@ export default function BatchDetail() {
   const { batchId } = useParams()
   const navigate = useNavigate()
 
-  const { data: batchData, isError: isBatchesError } = useQuery({
+  const { data: batchData, isError: isBatchesError, error: batchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batches = isBatchesError ? mockBatches : (batchData?.data ?? [])
+  const batches = batchData?.data ?? []
   const batch = batches.find((b) => b.batchId === batchId)
 
-  const { data: transactionsData, isLoading: isTransactionsLoading, isError: isTransactionsError } = useQuery({
+  const { data: transactionsData, isLoading: isTransactionsLoading, isError: isTransactionsError, error: transactionsError } = useQuery({
     queryKey: ['batchTransactions', batchId],
     queryFn: () => fetchBatchTransactions(batchId!),
     enabled: !!batchId,
   })
 
-  const transactions: BatchTransaction[] = isTransactionsError
-    ? toRows(batchTransactionsByBatch[batchId ?? ''] ?? {})
-    : toRows(transactionsData ?? {})
+  const transactions: BatchTransaction[] = toRows(transactionsData ?? {})
 
   return (
     <div className="space-y-6">
@@ -88,6 +85,8 @@ export default function BatchDetail() {
         <h1 className="text-2xl font-semibold tracking-tight">{batchId}</h1>
         <StatusBadge status={batch?.status ?? null} />
       </div>
+
+      {isBatchesError && <LoadError what="the batch" error={batchesError} />}
 
       {/* Info cards */}
       <div className="grid grid-cols-4 gap-4">
@@ -121,8 +120,8 @@ export default function BatchDetail() {
           </CardHeader>
           <CardContent className="p-0">
             {isTransactionsError && (
-              <div className="px-6 pb-3 text-xs text-orange-700">
-                Could not reach the API — showing cached data.
+              <div className="px-6 pb-3">
+                <LoadError what="the batch's transactions" error={transactionsError} />
               </div>
             )}
             <Table>
@@ -153,7 +152,7 @@ export default function BatchDetail() {
                     : (
                         <TableRow>
                           <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
-                            No transactions found.
+                            {isTransactionsError ? 'No transactions loaded.' : 'No transactions found.'}
                           </TableCell>
                         </TableRow>
                       )

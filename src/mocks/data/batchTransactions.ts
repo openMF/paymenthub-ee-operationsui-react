@@ -1,5 +1,5 @@
-// Mock shape mirrors the real API: a key-value map of transactionId -> status,
-// keyed here by batchId so the mock fallback can look up the selected batch.
+// Dev-only MSW data (src/mocks). Shape mirrors the real API: a key-value map of transactionId -> status,
+// keyed here by batchId so the handler can look up the requested batch.
 export const batchTransactionsByBatch: Record<string, Record<string, string>> = {
   'BATCH-001-2026': {
     'a1b2c3d4-0001-0001-0001-000000000001': 'COMPLETED',

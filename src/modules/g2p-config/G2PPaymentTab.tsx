@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchG2PConfigs } from '@/lib/api/g2pConfig'
-import { g2pConfigs as mockConfigs } from './mocks/g2pConfigs.mock'
 import type { G2PConfig } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
+import LoadError from '@/components/shared/LoadError'
 import {
   Table,
   TableBody,
@@ -42,15 +42,13 @@ export default function G2PPaymentTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['g2pConfigs'],
     queryFn: fetchG2PConfigs,
     retry: false,
   })
 
-  // Silently fall back to mock data if the API is unreachable (e.g. G2P
-  // service not deployed yet) — no error banner shown to the user.
-  const rows: G2PConfig[] = isError ? mockConfigs : (apiData ?? [])
+  const rows: G2PConfig[] = apiData ?? []
 
   const filtered = rows.filter(
     (c) => statusFilter === 'all' || c.status === statusFilter
@@ -61,6 +59,8 @@ export default function G2PPaymentTab() {
 
   return (
     <div className="space-y-4">
+      {isError && <LoadError what="G2P payment configurations" error={error} />}
+
       {/* Filter chips */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -163,7 +163,7 @@ export default function G2PPaymentTab() {
             {!isLoading && paginated.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  No records found.
+                  {isError ? 'No configurations loaded.' : 'No records found.'}
                 </TableCell>
               </TableRow>
             )}

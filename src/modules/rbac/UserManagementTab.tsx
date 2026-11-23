@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { UserPlus, KeyRound, Lock } from 'lucide-react'
-import { mockUsers } from './mocks/users.mock'
 import type { RBACUser, Role } from './types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +27,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useToast } from '@/components/shared/ToastProvider'
+import { NotAvailable } from '@/components/shared/LoadError'
 
 const ROLES: Role[] = ['Admin', 'Operator', 'Auditor']
 
@@ -39,7 +39,9 @@ const roleBadge: Record<Role, string> = {
 
 export default function UserManagementTab() {
   const { toast } = useToast()
-  const [users, setUsers] = useState<RBACUser[]>(mockUsers)
+  // No user-management backend is wired yet: the list held sample users in browser state,
+  // and adding or changing a user only changed that state.
+  const [users, setUsers] = useState<RBACUser[]>([])
   const [open, setOpen] = useState(false)
 
   // Add user form state
@@ -88,9 +90,12 @@ export default function UserManagementTab() {
 
   return (
     <div className="space-y-4">
+      <NotAvailable what="User management is" />
+
       {/* Header */}
       <div className="flex items-center justify-end">
         <Button
+          disabled
           className="bg-[#1565C0] hover:bg-[#0d47a1] text-white gap-1.5"
           onClick={() => setOpen(true)}
         >
@@ -167,6 +172,13 @@ export default function UserManagementTab() {
                 </TableCell>
               </TableRow>
             ))}
+            {users.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  Not available.
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>

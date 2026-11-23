@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { lookupBeneficiary, updateBeneficiary } from '@/lib/api/accountMapper'
-import { beneficiaries as mockBeneficiaries } from './mocks/beneficiaries.mock'
+import { errorText } from '@/lib/errorText'
 
 const PAYMENT_MODALITIES = [
   '(01) Mobile Money',
@@ -27,24 +27,6 @@ interface BeneficiaryData {
   bbic: string
 }
 
-function findInMock(beneficiaryId: string): BeneficiaryData | null {
-  const hit = mockBeneficiaries.find(
-    (b) =>
-      b.functionalId === beneficiaryId ||
-      b.financialAddress.includes(beneficiaryId),
-  )
-  return hit
-    ? {
-        functionalId: hit.functionalId,
-        governmentEntity: hit.governmentEntity,
-        financialInstitution: hit.financialInstitution,
-        financialAddress: hit.financialAddress,
-        paymentModality: hit.paymentModality,
-        bbic: hit.bbic ?? '',
-      }
-    : null
-}
-
 export default function SelfServicePortal() {
   const [searchParams] = useSearchParams()
   const beneficiaryId = searchParams.get('beneficiaryId') ?? ''
@@ -57,17 +39,14 @@ export default function SelfServicePortal() {
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Lookup query — falls back to mock on error
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['beneficiary', beneficiaryId],
     queryFn: () => lookupBeneficiary(beneficiaryId),
     enabled: !!beneficiaryId,
     retry: 1,
   })
 
-  // Resolve beneficiary: API first, mock fallback
-  const beneficiary: BeneficiaryData | null =
-    apiData ?? (isError ? findInMock(beneficiaryId) : null)
+  const beneficiary: BeneficiaryData | null = apiData ?? null
 
   // Pre-fill form once data resolves
   useEffect(() => {
@@ -101,8 +80,8 @@ export default function SelfServicePortal() {
       setErrorMsg('')
       setIsEditing(false)
     },
-    onError: () => {
-      setErrorMsg('Failed to update details. Please try again.')
+    onError: (updateError) => {
+      setErrorMsg(`Your details were not updated: ${errorText(updateError)}`)
       setSuccessMsg('')
     },
   })
@@ -160,6 +139,15 @@ export default function SelfServicePortal() {
       <div className="flex flex-col items-center gap-3 py-6">
         <Loader2 size={24} className="text-[#1565C0] animate-spin" />
         <p className="text-sm text-gray-500">Looking up your account…</p>
+      </div>,
+    )
+  }
+
+  if (isError) {
+    return shell(
+      <div className="flex items-start gap-2 text-sm text-red-600">
+        <AlertCircle size={16} className="shrink-0 mt-0.5" />
+        <span>Could not look up your account: {errorText(error)}</span>
       </div>,
     )
   }

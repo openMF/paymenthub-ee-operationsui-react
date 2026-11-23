@@ -90,7 +90,7 @@ root/
 
 - **Node.js 18+** and npm
 - **Docker Desktop** — for running Keycloak locally
-- Access to a **Mifos Gazelle** backend instance (or use built-in mock data)
+- Access to a **Mifos Gazelle** backend instance. Without one, screens show an error or an empty state, never sample data; for sample data in development, use MSW (`VITE_ENABLE_MSW=true`, dev server only)
 
 ---
 
@@ -132,7 +132,7 @@ npm run dev
 
 ### G2P Config mock testing
 
-Loads `.env.g2p`. Starts MSW (`VITE_ENABLE_MSW=true`) to serve mocked responses for the G2P Config endpoints (`/g2pPaymentConfig`, `/governmentEntity`, `/program`, `/dfsp`) — useful when the real G2P backend at `VITE_G2P_SERVICE_URL` isn't deployed yet.
+Loads `.env.g2p`. Starts MSW (`VITE_ENABLE_MSW=true`) to serve mocked responses for the G2P Config endpoints (`/g2pPaymentConfig`, `/governmentEntity`, `/program`, `/dfsp`) — useful when the real G2P backend at `VITE_G2P_SERVICE_URL` isn't deployed yet. It also serves sample Payment Hub batches, transfers, batch transactions and beneficiaries (`src/mocks/handlers/paymentHub.handlers.ts`). Sample data lives only in `src/mocks/` and tests: the screens themselves show Payment Hub's data, an empty state, an error or "not available", and `npm run check:no-mock-data` fails a production build that contains sample data.
 
 ```bash
 cp .env.example .env.g2p
@@ -157,7 +157,7 @@ Copy `.env.example` to `.env.development` (normal dev) or `.env.g2p` (G2P mock t
 | `VITE_KEYCLOAK_CLIENT_ID` | Keycloak client ID (e.g. `opsapp`) |
 | `VITE_TENANT_ID` | Default Platform Tenant Identifier used in API calls |
 | `VITE_G2P_SERVICE_URL` | Base URL for the G2P Payment Config backend |
-| `VITE_ENABLE_MSW` | When `true` (and running in dev), starts MSW to mock the G2P Config endpoints — see [G2P Config mock testing](#g2p-config-mock-testing) |
+| `VITE_ENABLE_MSW` | When `true` (and running in dev), starts MSW to mock the G2P Config and Payment Hub endpoints — see [G2P Config mock testing](#g2p-config-mock-testing) |
 
 ---
 
@@ -280,7 +280,7 @@ The self-service portal is a standalone, iframe-friendly page for beneficiaries 
 http://localhost:5173/account-mapper/self-service?beneficiaryId=9876543210
 ```
 
-- Looks up the beneficiary via `GET /beneficiary/{id}` (falls back to mock data if the API is unreachable)
+- Looks up the beneficiary via `GET /beneficiary/{id}`: a 404 shows "No account details found", any other failure shows "Could not look up your account" with the error (no mock fallback)
 - Pre-fills a form with current Financial Institution, Financial Address, and Payment Modality
 - On submit calls `PUT /beneficiary/{id}` via TanStack Query `useMutation`
 - No sidebar, no header — minimal white card layout, mobile responsive, embeddable in external portals

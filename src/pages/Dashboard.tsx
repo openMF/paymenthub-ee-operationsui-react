@@ -3,23 +3,20 @@ import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, Landmark, Ticket, Users, SlidersHorizontal, UserPlus } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import StatusBadge from '@/components/shared/StatusBadge'
+import LoadError, { NotAvailable } from '@/components/shared/LoadError'
 import { fetchMainBatches } from '@/lib/api/paymentHub'
-import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
-import { vouchers } from '@/modules/vouchers/mocks/vouchers.mock'
 import { formatAmount } from '@/lib/formatAmount'
 import { formatTime, withTimeZone } from '@/lib/formatTime'
-
-const recentVouchers = vouchers.slice(0, 5)
 
 export default function Dashboard() {
   const navigate = useNavigate()
 
-  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError } = useQuery({
+  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError, error: batchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const batches = isBatchesError ? mockBatches : (batchData?.data ?? [])
+  const batches = batchData?.data ?? []
   const recentBatches = batches.slice(0, 5)
 
   const totalBatches = batches.length
@@ -30,6 +27,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Dashboard</h1>
+
+      {isBatchesError && <LoadError what="batches" error={batchesError} />}
 
       {/* Row 1 — Stats */}
       <div className="grid grid-cols-4 gap-4">
@@ -105,6 +104,14 @@ export default function Dashboard() {
                         ))}
                       </tr>
                     ))
+                  : recentBatches.length === 0
+                  ? (
+                      <tr className="border-t border-gray-50">
+                        <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                          {isBatchesError ? 'No batches loaded.' : 'No records found.'}
+                        </td>
+                      </tr>
+                    )
                   : recentBatches.map((b) => (
                       <tr key={b.batchId} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.batchId}</td>
@@ -132,40 +139,9 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <ul>
-              {isBatchesLoading
-                ? Array.from({ length: 5 }).map((_, i) => (
-                    <li
-                      key={i}
-                      className={[
-                        'flex items-center justify-between px-6 py-3 gap-3',
-                        i !== 0 ? 'border-t border-gray-50' : '',
-                      ].join(' ')}
-                    >
-                      <div className="min-w-0 space-y-1.5">
-                        <div className="h-3.5 bg-gray-200 rounded animate-pulse w-28" />
-                        <div className="h-3 bg-gray-200 rounded animate-pulse w-20" />
-                      </div>
-                      <div className="h-5 bg-gray-200 rounded-full animate-pulse w-16" />
-                    </li>
-                  ))
-                : recentVouchers.map((v, i) => (
-                    <li
-                      key={v.serialNumber}
-                      className={[
-                        'flex items-center justify-between px-6 py-3 gap-3',
-                        i !== 0 ? 'border-t border-gray-50' : '',
-                        'hover:bg-gray-50 transition-colors',
-                      ].join(' ')}
-                    >
-                      <div className="min-w-0">
-                        <p className="font-mono text-xs text-gray-700 truncate">{v.serialNumber}</p>
-                        <p className="text-xs text-gray-400 truncate mt-0.5">{v.governmentEntity}</p>
-                      </div>
-                      <StatusBadge status={v.status} />
-                    </li>
-                  ))}
-            </ul>
+            <div className="px-6 pb-4">
+              <NotAvailable what="Vouchers are" />
+            </div>
           </CardContent>
         </Card>
       </div>

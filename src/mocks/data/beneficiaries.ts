@@ -1,4 +1,4 @@
-import type { Beneficiary } from '../types'
+import type { Beneficiary } from '@/modules/account-mapper/types'
 
 export const beneficiaries: Beneficiary[] = [
   {

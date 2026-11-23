@@ -8,7 +8,6 @@ import axios from 'axios'
 import apiClient from './client'
 import type { Beneficiary, BeneficiaryEntry } from '@/modules/account-mapper/types'
 import { paymentModalityLabel } from '@/modules/account-mapper/types'
-import { beneficiaries as beneficiariesMock } from '@/modules/account-mapper/mocks/beneficiaries.mock'
 
 /** A beneficiary as account-mapper returns it. */
 interface AccountMapperRecord {
@@ -91,12 +90,14 @@ export const submitBeneficiaries = async (
   return result
 }
 
+/** The beneficiary, or null when there is none (404). Any other failure is thrown, not hidden. */
 export const lookupBeneficiary = async (beneficiaryId: string) => {
   try {
     const response = await apiClient.get(`/beneficiary/${beneficiaryId}`)
     return response.data
-  } catch {
-    return beneficiariesMock.find((b) => b.functionalId === beneficiaryId) ?? null
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null
+    throw error
   }
 }
 
@@ -104,13 +105,10 @@ export const updateBeneficiary = async (
   beneficiaryId: string,
   data: { financialInstitution: string; financialAddress: string; paymentModality: string; bbic?: string },
 ) => {
-  try {
-    const response = await apiClient.put('/identityAccountMapper/beneficiary', {
-      beneficiaryId,
-      ...data,
-    })
-    return response.data
-  } catch {
-    return { responseCode: '00', responseDescription: 'Update successful' }
-  }
+  // A failed update is thrown, so the caller never reports it as successful.
+  const response = await apiClient.put('/identityAccountMapper/beneficiary', {
+    beneficiaryId,
+    ...data,
+  })
+  return response.data
 }

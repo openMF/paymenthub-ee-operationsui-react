@@ -1,4 +1,4 @@
-import type { Transfer } from '../types'
+import type { Transfer } from '@/modules/payment-hub/types'
 
 export const transfers: Transfer[] = [
   {

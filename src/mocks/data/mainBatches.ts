@@ -1,4 +1,4 @@
-import type { MainBatch } from '../types'
+import type { MainBatch } from '@/modules/payment-hub/types'
 
 export const mainBatches: MainBatch[] = [
   {
