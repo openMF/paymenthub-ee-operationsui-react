@@ -7,6 +7,7 @@ import { fetchMainBatches } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
 import { vouchers } from '@/modules/vouchers/mocks/vouchers.mock'
 import { formatAmount } from '@/lib/formatAmount'
+import { formatTime, withTimeZone } from '@/lib/formatTime'
 
 const recentVouchers = vouchers.slice(0, 5)
 
@@ -87,8 +88,8 @@ export default function Dashboard() {
               <thead>
                 <tr className="border-t border-gray-100">
                   <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Batch Reference</th>
-                  <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Start Time</th>
-                  <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Completed Time</th>
+                  <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{withTimeZone('Start Time')}</th>
+                  <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{withTimeZone('Completed Time')}</th>
                   <th className="text-right px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
                   <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
                 </tr>
@@ -107,8 +108,8 @@ export default function Dashboard() {
                   : recentBatches.map((b) => (
                       <tr key={b.batchId} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.batchId}</td>
-                        <td className="px-6 py-3 text-gray-600">{b.startedAt ? new Date(b.startedAt).toLocaleString() : '-'}</td>
-                        <td className="px-6 py-3 text-gray-600">{b.completedAt ? new Date(b.completedAt).toLocaleString() : '-'}</td>
+                        <td className="px-6 py-3 text-gray-600">{formatTime(b.startedAt)}</td>
+                        <td className="px-6 py-3 text-gray-600">{formatTime(b.completedAt)}</td>
                         <td className="px-6 py-3 text-right text-gray-700 font-medium">{formatAmount(b.totalAmount)}</td>
                         <td className="px-6 py-3">
                           <StatusBadge status={b.status ?? 'Unknown'} />
