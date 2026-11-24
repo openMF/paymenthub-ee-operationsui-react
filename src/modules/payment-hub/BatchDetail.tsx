@@ -11,15 +11,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { formatAmount } from '@/lib/formatAmount'
+import { formatTime, withTimeZone } from '@/lib/formatTime'
 
 const SKELETON_ROWS = 5
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
-}
-
-const formatDate = (ts: number | null) => (ts ? new Date(ts).toLocaleString() : '-')
 
 const formatField = (value: string | null | undefined) =>
   !value || value === 'null' ? '-' : value
@@ -112,8 +107,8 @@ export default function BatchDetail() {
           <CardContent>
             <InfoRow label="Batch ID" value={formatField(batch?.batchId)} />
             <InfoRow label="Payer FSP" value={formatField(batch?.payerFsp)} />
-            <InfoRow label="Started At" value={formatDate(batch?.startedAt ?? null)} />
-            <InfoRow label="Completed At" value={formatDate(batch?.completedAt ?? null)} />
+            <InfoRow label={withTimeZone('Started At')} value={formatTime(batch?.startedAt ?? null)} />
+            <InfoRow label={withTimeZone('Completed At')} value={formatTime(batch?.completedAt ?? null)} />
             <InfoRow label="Correlation ID" value={formatField(batch?.correlationId)} />
             <InfoRow label="Registering Institution ID" value={formatField(batch?.registeringInstitutionId)} />
           </CardContent>

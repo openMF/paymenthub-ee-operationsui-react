@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
+import { formatAmount } from '@/lib/formatAmount'
+import { formatTime, withTimeZone } from '@/lib/formatTime'
 
 const STATUSES = [
   { label: 'Completed', value: 'COMPLETED' },
@@ -22,11 +24,6 @@ const STATUSES = [
   { label: 'Rejected', value: 'FAILED' },
 ]
 const SKELETON_ROWS = 5
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
-}
 
 const formatInstitutionId = (id: string | null) =>
   !id || id === 'null' ? '-' : id
@@ -54,8 +51,8 @@ export default function MainBatchesTab() {
 
   const exportRows: Record<string, unknown>[] = filtered.map((b) => ({
     'Batch Reference': b.batchId,
-    'Start Time': b.startedAt ? new Date(b.startedAt).toLocaleString() : '-',
-    'Completed Time': b.completedAt ? new Date(b.completedAt).toLocaleString() : '-',
+    [withTimeZone('Start Time')]: formatTime(b.startedAt),
+    [withTimeZone('Completed Time')]: formatTime(b.completedAt),
     'Institution ID': formatInstitutionId(b.registeringInstitutionId),
     Instructions: b.totalTransactions,
     Amount: formatAmount(b.totalAmount),
@@ -103,8 +100,8 @@ export default function MainBatchesTab() {
             variant="outline" size="sm" className="gap-1.5 text-xs"
             onClick={() => exportPdf(
               'Main Batches',
-              ['Batch Reference', 'Start Time', 'Completed Time', 'Institution ID', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
-              filtered.map((b) => [b.batchId, b.startedAt ? new Date(b.startedAt).toLocaleString() : '-', b.completedAt ? new Date(b.completedAt).toLocaleString() : '-', formatInstitutionId(b.registeringInstitutionId), b.totalTransactions, formatAmount(b.totalAmount), b.payerFsp ?? '-', b.status ?? 'Unknown']),
+              ['Batch Reference', withTimeZone('Start Time'), withTimeZone('Completed Time'), 'Institution ID', 'Instructions', 'Amount', 'Payer FSP', 'Status'],
+              filtered.map((b) => [b.batchId, formatTime(b.startedAt), formatTime(b.completedAt), formatInstitutionId(b.registeringInstitutionId), b.totalTransactions, formatAmount(b.totalAmount), b.payerFsp ?? '-', b.status ?? 'Unknown']),
               `main-batches-${csvDate()}.pdf`,
             )}
           >
@@ -127,8 +124,8 @@ export default function MainBatchesTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Batch Reference</TableHead>
-              <TableHead>Start Time</TableHead>
-              <TableHead>Completed Time</TableHead>
+              <TableHead>{withTimeZone('Start Time')}</TableHead>
+              <TableHead>{withTimeZone('Completed Time')}</TableHead>
               <TableHead>Institution ID</TableHead>
               <TableHead className="text-right">Instructions</TableHead>
               <TableHead className="text-right">Amount</TableHead>
@@ -155,8 +152,8 @@ export default function MainBatchesTab() {
                       onClick={() => navigate(`/payment-hub/batch/${batch.batchId}`)}
                     >
                       <TableCell className="font-medium">{batch.batchId}</TableCell>
-                      <TableCell>{batch.startedAt ? new Date(batch.startedAt).toLocaleString() : '-'}</TableCell>
-                      <TableCell>{batch.completedAt ? new Date(batch.completedAt).toLocaleString() : '-'}</TableCell>
+                      <TableCell>{formatTime(batch.startedAt)}</TableCell>
+                      <TableCell>{formatTime(batch.completedAt)}</TableCell>
                       <TableCell>{formatInstitutionId(batch.registeringInstitutionId)}</TableCell>
                       <TableCell className="text-right">{batch.totalTransactions}</TableCell>
                       <TableCell className="text-right">{formatAmount(batch.totalAmount)}</TableCell>

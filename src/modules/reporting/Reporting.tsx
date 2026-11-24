@@ -20,6 +20,8 @@ import { fetchMainBatches, fetchTransfers } from '@/lib/api/paymentHub'
 import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
 import { transfers as mockTransfers } from '@/modules/payment-hub/mocks/transfers.mock'
 import type { MainBatch } from '@/modules/payment-hub/types'
+import { formatAmount } from '@/lib/formatAmount'
+import { formatTime, withTimeZone } from '@/lib/formatTime'
 
 // ── Mock data (fallback for charts with no real endpoint yet) ──────────────
 
@@ -46,11 +48,6 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: '#22c55e',
   IN_PROGRESS: '#f97316',
   FAILED: '#ef4444',
-}
-
-const formatAmount = (amount: number | null) => {
-  if (!amount) return '0'
-  return Math.abs(amount / 100).toLocaleString()
 }
 
 function buildStatusBreakdown(batches: MainBatch[]) {
@@ -180,7 +177,7 @@ export default function Reporting() {
       {/* Row 1 — KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard label="Total Transactions" value={totalTransactions.toLocaleString()} trend="up" isLoading={isBatchesLoading} />
-        <KpiCard label="Total Amount Disbursed" value={`$${totalAmount}`} trend="up" isLoading={isBatchesLoading} />
+        <KpiCard label="Total Amount Disbursed" value={totalAmount} trend="up" isLoading={isBatchesLoading} />
         <KpiCard label="Success Rate" value={`${successRate}%`} trend="up" isLoading={isBatchesLoading} />
         <KpiCard label="Failure Rate" value={`${failureRate}%`} trend="down" isLoading={isBatchesLoading} />
       </div>
@@ -294,7 +291,7 @@ export default function Reporting() {
             <thead>
               <tr className="border-t border-gray-100">
                 <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Batch Reference</th>
-                <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Start Time</th>
+                <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">{withTimeZone('Start Time')}</th>
                 <th className="text-right px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Amount</th>
                 <th className="text-left px-6 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>
               </tr>
@@ -304,7 +301,7 @@ export default function Reporting() {
                 ? failedBatches.map((b) => (
                     <tr key={b.batchId} className="border-t border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-3 font-mono text-xs text-gray-700">{b.batchId}</td>
-                      <td className="px-6 py-3 text-gray-600">{b.startedAt ? new Date(b.startedAt).toLocaleString() : '-'}</td>
+                      <td className="px-6 py-3 text-gray-600">{formatTime(b.startedAt)}</td>
                       <td className="px-6 py-3 text-right font-medium text-gray-700">{formatAmount(b.totalAmount)}</td>
                       <td className="px-6 py-3"><StatusBadge status={b.status} /></td>
                     </tr>
