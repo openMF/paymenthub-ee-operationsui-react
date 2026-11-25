@@ -7,7 +7,6 @@
     "dev": "vite",
     "dev:g2p": "vite --mode g2p",
     "build": "tsc -b && vite build",
-    "check:no-mock-data": "node scripts/check-no-mock-data.mjs",
     "build:g2p": "tsc -b && vite build --mode g2p",
     "lint": "eslint .",
     "preview": "vite preview",

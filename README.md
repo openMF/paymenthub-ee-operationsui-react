@@ -64,7 +64,7 @@ src/
 │   ├── exportCsv.ts           # CSV download utility
 │   └── exportPdf.ts           # PDF download utility (jsPDF)
 ├── mocks/                     # Dev-server-only MSW handlers and sample data (see docs/MOCK-DATA.md)
-├── test/setup.ts              # Vitest setup (jest-dom)
+├── test/                      # Vitest setup, and mockDataGate.test.ts (mock data only behind the config check)
 ├── pages/                     # Thin re-exports wiring modules to routes, plus Dashboard and NotFound
 ├── config/                    # Constants (APP_NAME, TENANTS, DEFAULT_TENANT)
 ├── main.tsx                   # Router setup, QueryClient, KeycloakProvider, MSW start (dev only)
@@ -76,7 +76,6 @@ root/
 ├── public/env-config.js       # Runtime config placeholder; the Docker image rewrites it at start
 ├── docker/                    # nginx config and the entrypoint that writes env-config.js
 ├── Dockerfile                 # node:20 build, nginx:1.27 runtime
-├── scripts/check-no-mock-data.mjs  # Fails if a build contains sample data
 ├── .env.example               # Environment variable template
 ├── .env.development           # npm run dev (gitignored)
 ├── .env.g2p                   # npm run dev:g2p (gitignored)
@@ -294,13 +293,12 @@ Both run `tsc -b` and then `vite build`, and write to `dist/`. They differ only 
 
 | Command | What it does | Where it runs automatically |
 |---|---|---|
-| `npm test` | Vitest, watch mode (`npm test -- --run` once; `test:ui`, `test:coverage`) | CircleCI |
+| `npm test` | Vitest, watch mode (`npm test -- --run` once; `test:ui`, `test:coverage`). Includes `mockDataGate.test.ts`, which fails if a screen imports sample data or MSW starts without the config check | CircleCI |
 | `npx tsc --noEmit` | Type check only | CircleCI |
 | `npm run build` | Type check (`tsc -b`) and build | The image build (`Dockerfile`) |
-| `npm run check:no-mock-data` | Fails if `dist/` contains sample data; run after a build | The image build, straight after `npm run build` |
 | `npm run lint` | ESLint | Nowhere: `dev` has 13 problems (11 errors, 2 warnings) |
 
-CI is CircleCI (`.circleci/config.yml`): it runs the type check and tests, then builds and pushes the Docker image, whose build runs `npm run build` and `npm run check:no-mock-data`. `.github/workflows/ci.yml` runs the same steps but only when started by hand (`workflow_dispatch`).
+CI is CircleCI (`.circleci/config.yml`): it runs the type check and tests, then builds and pushes the Docker image, whose build runs `npm run build`. `.github/workflows/ci.yml` runs the build, type check and tests too, but only when started by hand (`workflow_dispatch`).
 
 ## Deploying with Docker
 

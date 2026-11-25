@@ -28,7 +28,7 @@ Mock data is served by [Mock Service Worker](https://mswjs.io) (MSW). MSW starts
 | The Docker image (Gazelle and other deployments) | No. The container's `VITE_ENABLE_MSW` is written into `env-config.js`, but nothing reads it there |
 | Tests (`npm test`) | Only the responses each test sets up itself, see [Tests](#tests) |
 
-In a production build `import.meta.env.DEV` is the constant `false`. The bundler therefore removes the `import('./mocks/browser')` call, and none of `src/mocks/` ends up in `dist/`. `npm run check:no-mock-data` checks this in every image build (see [Keeping sample data out of production](#keeping-sample-data-out-of-production)). Built with `--mode g2p` and `VITE_ENABLE_MSW=true`, the bundle still contains no MSW code or sample data (checked 2026-11-25).
+In a production build `import.meta.env.DEV` is the constant `false`. The bundler therefore removes the `import('./mocks/browser')` call, and none of `src/mocks/` ends up in `dist/`. A test keeps it that way (see [Keeping sample data out of production](#keeping-sample-data-out-of-production)). Built with `--mode g2p` and `VITE_ENABLE_MSW=true`, the bundle still contains no MSW code or sample data (checked 2026-11-25).
 
 `public/mockServiceWorker.js` is copied into every build, because Vite copies all of `public/`. It does nothing unless a page registers it, and a production build never does.
 
@@ -88,15 +88,17 @@ Tests don't use the dev-mode worker or `src/mocks/data/`. Each test sets up the 
 
 1. Put the data in `src/mocks/data/<name>.ts`, typed against the module's `types.ts`. Shape it as the real endpoint answers, checked against a real response. A wrong mock teaches the screen the wrong shape.
 2. Serve it from a handler in `src/mocks/handlers/`, and register the handler in `src/mocks/browser.ts`.
-3. Add a string that appears only in that data (an id, say) to `MARKERS` in `scripts/check-no-mock-data.mjs`, so the image build fails if it ever reaches a production build.
-4. Never import `src/mocks/` from application code. The only import is the dynamic one in `enableMocking()`, which is behind the `DEV` check.
+3. Never import `src/mocks/` or `msw` from application code. The only import is the dynamic one in `enableMocking()`, behind the config check; `mockDataGate.test.ts` fails otherwise.
 
 ## Keeping sample data out of production
 
-`npm run check:no-mock-data` (`scripts/check-no-mock-data.mjs`) scans the built files for the markers above. It skips `mockServiceWorker.js`, and exits non-zero if it finds a marker. The `Dockerfile` runs it straight after `npm run build`, so an image whose bundle contains a marker fails to build; every image CircleCI publishes is built that way. `.github/workflows/ci.yml` also runs it, but that workflow only runs when started by hand. Run it yourself after a build:
+Two things keep sample data out of every build, whatever the config:
 
-```bash
-npm run build && npm run check:no-mock-data
-```
+- **Only one file may load it, and only behind the config check.** `src/test/mockDataGate.test.ts` reads every source file and fails if:
+  - any file other than `main.tsx`, the tests and `src/mocks/` imports from a `mocks` folder or from `msw`. That catches the pattern PHEE-468 removed: a screen importing a mock file and showing it when a call failed (`isError ? mock : data`).
+  - `main.tsx` imports anything from `mocks` except `import('./mocks/browser')`, imports it more than once, or imports it outside `if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_MSW === 'true') {`.
+- **A production build drops that one import.** There `import.meta.env.DEV` is the constant `false`, so the bundler removes the gated block and everything it would load.
 
-It catches sample data that is already marked. Sample data added without a marker isn't caught, so step 3 above matters.
+The test runs with the others (`npm test`, and in CircleCI). It doesn't catch sample rows typed straight into a screen. Review is the check for that, and `noMockFallback.test.tsx` checks what the payment-hub screens show when a call fails.
+
+If you rename `enableMocking()`'s condition or the worker file, update `GATE` and `ALLOWED_MOCK_IMPORT` at the top of the test.

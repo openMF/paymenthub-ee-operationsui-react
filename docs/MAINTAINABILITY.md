@@ -19,7 +19,7 @@ There is no formal, written PR template or required-reviewer policy encoded in t
 
 - Keep PRs scoped to one module or one cross-cutting concern (e.g. "wire Payment Hub to real API" as its own PR, not bundled with an unrelated RBAC change).
 - Run `npm run build` locally before opening a PR — it runs `tsc -b` first, so a broken build catches type errors that `npm run dev` (plain `vite`, no type-checking) won't surface. `vite dev` will happily serve a file with type errors; only `build` (or a manual `tsc --noEmit`) actually checks types.
-- Run `npm test -- --run` and `npm run build && npm run check:no-mock-data`. CircleCI runs the tests, and the image build runs the build and the check.
+- Run `npm test -- --run` and `npm run build`. CircleCI runs the tests, and the image build runs the build.
 - Run `npm run lint` before requesting review. Nothing runs it automatically, and `dev` has 13 problems (11 errors, 2 warnings) that predate CI, so check that your change adds none rather than expecting a clean run. See the "Adding Dependencies" section for what's configured.
 - If you're the reviewer and see feedback with fabricated specifics (a function name, a field that supposedly exists, an "as the PR description says" claim) — verify it against the actual code before accepting it. Several past review cycles on this project caught reviewer suggestions that referenced field names or endpoint shapes that didn't match what the code actually had.
 
@@ -33,7 +33,7 @@ There is no formal, written PR template or required-reviewer policy encoded in t
 
 ## Testing Approach
 
-Tests run on **Vitest** (`vite.config.ts` `test` block: jsdom, globals, `src/test/setup.ts` loads `@testing-library/jest-dom`), with React Testing Library and `msw/node`. Test files sit next to the code as `*.test.ts(x)`. CircleCI (`.circleci/config.yml`) runs `npx tsc --noEmit` and the tests before it builds the Docker image; the image build runs `npm run build` and `npm run check:no-mock-data`. `.github/workflows/ci.yml` has the same steps but runs only when started by hand.
+Tests run on **Vitest** (`vite.config.ts` `test` block: jsdom, globals, `src/test/setup.ts` loads `@testing-library/jest-dom`), with React Testing Library and `msw/node`. Test files sit next to the code as `*.test.ts(x)`. CircleCI (`.circleci/config.yml`) runs `npx tsc --noEmit` and the tests before it builds the Docker image, whose build runs `npm run build`. `.github/workflows/ci.yml` has the same steps but runs only when started by hand.
 
 ```bash
 npm test             # watch mode
@@ -41,7 +41,7 @@ npm test -- --run    # once, as CircleCI does
 npm run test:coverage
 ```
 
-What is covered today (13 files, 63 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
+What is covered today (14 files, 72 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; `mockDataGate.test.ts` (sample data only behind the config check); and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
 
 For any component you touch that fetches data, test or at least check by hand its four states: loading skeleton, data, empty result, and error (`LoadError`). These are where this codebase's past bugs clustered. A test can set up the API's answer with `vi.mock()` of the API module (as `noMockFallback.test.tsx` does) or with an `msw/node` server (as `accountMapper.test.ts` does).
 
@@ -55,7 +55,7 @@ For any component you touch that fetches data, test or at least check by hand it
 
 ## Mock Data Strategy
 
-Screens never show sample data in place of Payment Hub's (PHEE-468). Sample data lives only in `src/mocks/` (served by MSW on the dev server when `VITE_ENABLE_MSW=true`) and in tests. A production build never contains it, and the image build checks that with `npm run check:no-mock-data`. When, how and what is mocked, and how to add sample data, is in [MOCK-DATA.md](MOCK-DATA.md).
+Screens never show sample data in place of Payment Hub's (PHEE-468). Sample data lives only in `src/mocks/` and in tests. It reaches the app only through MSW, which `main.tsx` starts only on the dev server with `VITE_ENABLE_MSW=true`; `src/test/mockDataGate.test.ts` fails if a screen imports sample data or that config check is removed. When, how and what is mocked, and how to add sample data, is in [MOCK-DATA.md](MOCK-DATA.md).
 
 Keep in mind:
 
