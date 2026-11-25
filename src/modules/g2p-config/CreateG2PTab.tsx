@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CheckCircle, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
+import { NotAvailable } from '@/components/shared/LoadError'
 import type { G2PConfig, GovernmentEntity, Program, DFSP } from './types'
 import { fetchGovernmentEntities, fetchPrograms, fetchDFSPs } from '@/lib/api/g2pConfig'
 
@@ -18,7 +19,6 @@ const STATUSES: G2PConfig['status'][] = ['Active', 'Inactive']
 
 interface Props {
   onCancel: () => void
-  onSuccess: () => void
 }
 
 interface FormState {
@@ -37,9 +37,11 @@ const empty: FormState = {
   status: '',
 }
 
-export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
+// Saving isn't connected yet: the form used to show "created successfully" without sending
+// anything (PHEE-468). The BFF has POST /g2pPaymentConfig, but its shapes differ from this
+// form's (ids, nested entities), so wiring it is its own task.
+export default function CreateG2PTab({ onCancel }: Props) {
   const [form, setForm] = useState<FormState>(empty)
-  const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { data: governmentEntities } = useQuery({
@@ -67,12 +69,6 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
       return
     }
     setError(null)
-    setSuccess(true)
-    setTimeout(() => {
-      setSuccess(false)
-      setForm(empty)
-      onSuccess()
-    }, 1500)
   }
 
   return (
@@ -85,12 +81,7 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
           </p>
         </div>
 
-        {success && (
-          <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            G2P Payment Config created successfully
-          </div>
-        )}
+        <NotAvailable what="Saving G2P payment configs is" />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -191,7 +182,7 @@ export default function CreateG2PTab({ onCancel, onSuccess }: Props) {
             <Button
               type="submit"
               className="w-full bg-[#1565C0] hover:bg-[#0d47a1] text-white"
-              disabled={success}
+              disabled
             >
               + Create Config
             </Button>

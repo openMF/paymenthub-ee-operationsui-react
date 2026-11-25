@@ -34,7 +34,6 @@ export default function G2PConfig() {
         <TabsContent value="create" className="mt-4">
           <CreateG2PTab
             onCancel={() => setTab('g2p-payment')}
-            onSuccess={() => setTab('g2p-payment')}
           />
         </TabsContent>
       </Tabs>
