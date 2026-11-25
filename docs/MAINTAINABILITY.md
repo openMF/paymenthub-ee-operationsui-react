@@ -9,7 +9,8 @@ This document covers how the codebase is kept consistent day to day: conventions
 - **No barrel exports.** No module has an `index.ts` — import directly from the file (`import MainBatchesTab from './MainBatchesTab'`). Don't introduce one in a single module; it'd be inconsistent with every other module in the repo.
 - **Nullability:** model backend nulls explicitly in `types.ts` (`status: string | null`, not `status: string`), and handle `null`/`undefined` at render time rather than assuming a field is always populated. Several past bugs in this codebase were exactly this: treating an optional field as always-present.
 - **Status colors:** all status→color mapping goes through the shared `StatusBadge` component (`src/components/shared/StatusBadge.tsx`) and its `statusStyles` map — don't hand-roll a new colored-pill component for a new status set.
-- **Data fetching:** TanStack Query + `isError`-gated mock fallback, described in `docs/EXTENSIBILITY.md`'s "API Integration Pattern" section. Don't fall back to mock data on an empty successful response — only on an actual fetch error.
+- **Data fetching:** TanStack Query, with the four states described in `docs/EXTENSIBILITY.md`'s "API Integration Pattern" section: data, empty, error (`LoadError`), not available (`NotAvailable`). Screens never show sample data in place of Payment Hub's: not on an error, not on an empty answer, not for a screen with no backend. See [MOCK-DATA.md](MOCK-DATA.md).
+- **Amounts and times:** format amounts with `formatAmount()` (`src/lib/formatAmount.ts`: shown as Payment Hub returns them, with their sign and the currency's decimal places) and times with `formatTime()` / `withTimeZone()` (`src/lib/formatTime.ts`). Don't divide amounts by 100 or drop their sign.
 - **Formatting:** there is **no Prettier** in this repo — no `.prettierrc*`, no `prettier` dependency. Formatting is whatever your editor does plus ESLint's opinions; match the surrounding file's style (2-space indent, no semicolons, single quotes) since that's the prevailing convention throughout `src/`, even though nothing enforces it automatically.
 
 ## PR Process
@@ -18,7 +19,8 @@ There is no formal, written PR template or required-reviewer policy encoded in t
 
 - Keep PRs scoped to one module or one cross-cutting concern (e.g. "wire Payment Hub to real API" as its own PR, not bundled with an unrelated RBAC change).
 - Run `npm run build` locally before opening a PR — it runs `tsc -b` first, so a broken build catches type errors that `npm run dev` (plain `vite`, no type-checking) won't surface. `vite dev` will happily serve a file with type errors; only `build` (or a manual `tsc --noEmit`) actually checks types.
-- Run `npm run lint` and fix what it flags before requesting review — see the "Adding Dependencies" section for what's actually configured.
+- Run `npm test -- --run` and `npm run build && npm run check:no-mock-data`. CircleCI runs the tests, and the image build runs the build and the check.
+- Run `npm run lint` before requesting review. Nothing runs it automatically, and `dev` has 13 problems (11 errors, 2 warnings) that predate CI, so check that your change adds none rather than expecting a clean run. See the "Adding Dependencies" section for what's configured.
 - If you're the reviewer and see feedback with fabricated specifics (a function name, a field that supposedly exists, an "as the PR description says" claim) — verify it against the actual code before accepting it. Several past review cycles on this project caught reviewer suggestions that referenced field names or endpoint shapes that didn't match what the code actually had.
 
 ## Adding Dependencies
@@ -27,35 +29,39 @@ There is no formal, written PR template or required-reviewer policy encoded in t
 - No Prettier, no Stylelint, no commit hooks (no Husky/lint-staged config present) — nothing blocks a commit or push based on lint/format state today. Don't assume a pre-commit hook will catch what you didn't check yourself.
 - Before adding a new package, check whether an existing dependency already covers the need — this app already carries `axios`, `@tanstack/react-query`, `recharts` (charts), `jspdf`/`jspdf-autotable` (PDF export), `lucide-react` (icons), `class-variance-authority`/`clsx`/`tailwind-merge` (styling utilities), and the full `radix-ui` primitive set via shadcn. A new charting, icon, or PDF library is very unlikely to be justified.
 - When you do add something, prefer a scoped, actively maintained package over a kitchen-sink framework, and add it to the correct `dependencies`/`devDependencies` bucket — build-only tooling (test runners, type stubs) belongs in `devDependencies`; anything imported by app code at runtime belongs in `dependencies`.
-- `msw` (Mock Service Worker) is already a devDependency, but currently wired only for **dev-mode API mocking** (`enableMocking()` in `main.tsx`, gated on `import.meta.env.DEV`) — not for tests, since there are no tests yet (see below). If you use MSW handlers for a new module, add them under `src/mocks/handlers/` following the existing `g2p.handlers.ts` pattern and register them in `src/mocks/browser.ts`.
+- `msw` (Mock Service Worker) is a devDependency, used two ways: dev-server mock data (`enableMocking()` in `main.tsx`, only when `import.meta.env.DEV` and `VITE_ENABLE_MSW=true`), and `msw/node` in tests. How to add sample data is in [MOCK-DATA.md](MOCK-DATA.md#adding-sample-data).
 
 ## Testing Approach
 
-**There is currently no automated testing in this repository.** No test runner is configured (no Vitest, no Jest — no config file for either, no `test` script in `package.json`), no `*.test.tsx`/`*.spec.tsx` files exist anywhere in `src/`, and no testing-library packages are installed.
+Tests run on **Vitest** (`vite.config.ts` `test` block: jsdom, globals, `src/test/setup.ts` loads `@testing-library/jest-dom`), with React Testing Library and `msw/node`. Test files sit next to the code as `*.test.ts(x)`. CircleCI (`.circleci/config.yml`) runs `npx tsc --noEmit` and the tests before it builds the Docker image; the image build runs `npm run build` and `npm run check:no-mock-data`. `.github/workflows/ci.yml` has the same steps but runs only when started by hand.
 
-This means:
+```bash
+npm test             # watch mode
+npm test -- --run    # once, as CircleCI does
+npm run test:coverage
+```
 
-- Correctness today is verified by `tsc -b` (type checking), `npm run lint` (ESLint), a manual `npm run build`, and manual/visual verification in the browser. That's a real gap, not a stopgap for something more rigorous — treat "I ran the build and it compiled" as necessary but not sufficient evidence a change works.
-- If you're introducing non-trivial logic (a data-transform function, a status/rate calculation, a date-grouping helper), consider whether this is the PR to also introduce Vitest — it's the natural fit given the Vite toolchain already in place, and would need: `vitest` + `@testing-library/react` + `@testing-library/jest-dom` as devDependencies, a `vitest.config.ts` (or a `test` block in `vite.config.ts`), and a `"test": "vitest"` script. Don't do this silently as a side effect of an unrelated feature PR — it's a repo-wide decision worth its own PR and sign-off.
-- Until then, manually exercise: the happy path, the loading-skeleton state, the `isError` fallback-to-mock state, and the empty-result state, for any component you touch that fetches data. These four states are exactly where this codebase's past bugs have clustered (see the git history around the `isError`-vs-empty-array fallback fix across several tabs).
+What is covered today (13 files, 63 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
+
+For any component you touch that fetches data, test or at least check by hand its four states: loading skeleton, data, empty result, and error (`LoadError`). These are where this codebase's past bugs clustered. A test can set up the API's answer with `vi.mock()` of the API module (as `noMockFallback.test.tsx` does) or with an `msw/node` server (as `accountMapper.test.ts` does).
 
 ## Environment Configuration
 
-- Env vars are Vite-standard: `VITE_`-prefixed to be exposed to client code, read via `import.meta.env.VITE_X`. See `.env.example` for the current full list (`VITE_API_BASE_URL`, `VITE_BULK_CONNECTOR_URL`, `VITE_KEYCLOAK_URL`, `VITE_KEYCLOAK_REALM`, `VITE_KEYCLOAK_CLIENT_ID`, `VITE_TENANT_ID`, `VITE_G2P_SERVICE_URL`).
+- Env vars are Vite-standard: `VITE_`-prefixed to be exposed to client code. See `.env.example` for the full list. Read deployment settings (URLs, Keycloak) with `getEnv('VITE_X')` from `src/lib/runtime-config.ts`, not `import.meta.env.VITE_X`. `getEnv` prefers the value the Docker image writes into `env-config.js` at container start, so one image works for any deployment. Add a new runtime key to `docker/docker-entrypoint.sh` too.
+- `VITE_ENABLE_MSW` is the exception: `main.tsx` reads it from `import.meta.env`, and only on the dev server, so a deployed image can't turn mock data on. `VITE_TENANT_ID` and `VITE_BULK_CONNECTOR_URL` are in `.env.example` and the entrypoint but no code reads them yet.
 - **No typed `ImportMetaEnv`** — there's no `vite-env.d.ts` augmenting the env var types, so a typo'd or missing `VITE_*` reference won't be caught by TypeScript; it'll just resolve to `undefined` at runtime. Double-check env var names by hand when adding or renaming one.
-- Whenever you add a new env var, update **both** `.env` (your local value, gitignored) and `.env.example` (blank placeholder, committed) — a var only in `.env` means every other developer's checkout silently lacks it with no error, just a broken feature.
-- Multi-tenancy: the app reads a `tenant` value from `localStorage` (defaulting to `greenbank`), sent as a `Platform-TenantId` header by the shared `apiClient`'s request interceptor (`src/lib/api/client.ts`). If your module's backend is tenant-scoped and you're using the shared `apiClient`, this is handled for you automatically; if you create a separate axios instance (see `g2pConfig.ts`), you'd need to add the same header yourself if that backend also needs it.
+- Whenever you add a new env var, update **both** your local env file (`.env.development` or `.env.g2p`, gitignored) and `.env.example` (committed) — a var only in `.env` means every other developer's checkout silently lacks it with no error, just a broken feature.
+- Multi-tenancy: the app reads a `tenant` value from `localStorage` (defaulting to `greenbank`), set from the login screen, the header or Settings, and sends it as a `Platform-TenantId` header from the shared request interceptor (`createAuthInterceptors()` in `src/lib/api/authInterceptors.ts`, used by `client.ts` and `g2pConfig.ts`). If your module's backend is tenant-scoped and you're using the shared `apiClient`, this is handled for you automatically; if you create a separate axios instance, attach `createAuthInterceptors()` to it as `g2pConfig.ts` does.
 
 ## Mock Data Strategy
 
-Every module ships hand-written mock data under `src/modules/<name>/mocks/`, typed against that module's `types.ts`. This mock data is not disposable scaffolding — it's the fallback rendered whenever a `useQuery` call fails (`isError === true`), so it's part of the shipped UX for "backend is down," not just a development convenience.
+Screens never show sample data in place of Payment Hub's (PHEE-468). Sample data lives only in `src/mocks/` (served by MSW on the dev server when `VITE_ENABLE_MSW=true`) and in tests. A production build never contains it, and the image build checks that with `npm run check:no-mock-data`. When, how and what is mocked, and how to add sample data, is in [MOCK-DATA.md](MOCK-DATA.md).
 
 Keep in mind:
 
-- Mock data must stay in sync with the type it's typed against — a stale mock missing a newly required field is a compile error waiting to be silenced with an `any` cast; fix the mock, don't cast around it.
-- Mock data should be realistic enough to exercise pagination, filtering, and empty/edge-case states — several existing mocks (e.g. `mainBatches.mock.ts`) deliberately include a spread of statuses and null fields for exactly this reason.
-- When a real endpoint's response shape differs from what was assumed when the mock was written, the mock needs to be corrected to match reality — this has happened repeatedly during the Payment Hub API integration (mock fields renamed from `batchReferenceNumber`/`sourceMinistry`/etc. to the real `batchId`/`payerFsp`/etc.), and a stale mock silently misleads anyone hitting the fallback path.
-- MSW handlers (`src/mocks/handlers/`) are a second, separate mock layer used only in dev mode to intercept actual HTTP calls before they leave the browser — currently used for the G2P Config module (`localhost:8084` endpoints not yet deployed). Use this when you need to develop against an endpoint that doesn't exist yet at all, as opposed to the `isError`-fallback mock, which is for when a real endpoint exists but might be unreachable.
+- Sample data must stay in sync with the type it's typed against. A stale mock missing a newly required field is a compile error waiting to be silenced with an `any` cast: fix the mock, don't cast around it.
+- Shape it as the real endpoint answers, checked against a real response. This has gone wrong before: mock fields had to be renamed from `batchReferenceNumber`/`sourceMinistry` to the real `batchId`/`payerFsp`, and so on.
+- Give it enough variety (statuses, null fields, several pages) to exercise pagination, filters and edge cases while you work on a screen.
 
 ## API Integration Checklist
 
@@ -63,18 +69,22 @@ When wiring a module to a real backend (Step 8 in `docs/EXTENSIBILITY.md`), work
 
 - [ ] Confirm the **actual** response shape against a real payload (or a teammate's sample JSON) — don't assume field names/casing from a spec or a PR description; those have been wrong before in this codebase (e.g. an assumed `size: 50` that turned out to not match what was actually implemented, and several assumed field names that didn't match the real Gazelle API).
 - [ ] Update `types.ts` to match the verified real shape, including nullability.
-- [ ] Update the mock data to match the same shape, so the `isError` fallback path stays truthful.
-- [ ] Confirm the fallback condition is `isError ? mock : (data ?? [])`, not `data?.length ? data : mock` — the latter masks legitimate empty results as errors.
+- [ ] If the endpoint has dev-server sample data in `src/mocks/data/`, update it to the same shape.
+- [ ] Confirm the screen shows `LoadError` on an error and "No records found." on an empty answer, and never substitutes rows of its own.
 - [ ] Confirm `StatusBadge` has entries for every real status string your endpoint can return, in the exact casing the backend sends (`COMPLETED` vs `Completed` are different keys).
-- [ ] If amounts come back as minor-unit integers or as signed strings (seen in the Transfers endpoint), confirm the display formatting (`Math.abs(amount / 100).toLocaleString()`) matches what the backend actually does, rather than assuming major-unit floats.
+- [ ] Format amounts with `formatAmount()`. Payment Hub returns major units, as stored, sometimes as signed strings (Transfers). Don't divide by 100 or take `Math.abs` (PHEE-416 fixed both).
 - [ ] Confirm date/timestamp fields are epoch milliseconds vs. ISO strings vs. epoch seconds before formatting — this codebase has both `startedAt: number` (epoch ms) and `startTime: string` (ISO-ish) fields across different modules; don't assume one format based on a field's name alone.
-- [ ] Verify loading skeleton, error banner, and empty state all render correctly by temporarily forcing each condition (e.g. point `VITE_*_URL` at an invalid host to force `isError`).
+- [ ] Verify the loading skeleton, `LoadError` and empty state all render, in a test or by forcing each condition (for example point `VITE_API_BASE_URL` at an invalid host to force an error).
 
 ## Known Limitations
 
 Documenting these plainly so they're treated as known debt rather than rediscovered as surprises:
 
-- **No automated tests.** See "Testing Approach" above.
+- **Few component tests.** See "Testing Approach" above.
+- **Lint isn't clean or run automatically.** 13 problems on `dev`; see "PR Process".
+- **Settings saves nothing.** Its Save buttons show "Settings saved successfully" but store no value.
+- **Role cards are fixed text.** RBAC's Role Configuration cards are defined in `RoleConfigTab.tsx`, not read from Keycloak, and not enforced (see the next item).
+- **Screens with no backend yet:** vouchers (and the Dashboard's recent vouchers), User Management, and Reporting's ministry and DFSP charts show "not available".
 - **No RBAC enforcement.** `useAuth().hasRole` exists but is not called anywhere except its own definition — every authenticated user can reach every route and action regardless of their Keycloak role. See `docs/EXTENSIBILITY.md`'s "Keycloak RBAC" section if you need to actually gate something.
 - **Dead sidebar link.** `AppLayout.tsx`'s `navItems` includes "Audit Trails" pointing at `/audit`, which is not registered in `src/main.tsx` — clicking it renders the catch-all `NotFound` page. Either register the route or remove the nav entry.
 - **Duplicate sidebar targets.** "Users" and "Roles & Permissions" both link to `/rbac` — there's a single RBAC page with tabs, but two separate nav entries pointing at the same URL rather than one entry, or two entries deep-linking to specific tabs.

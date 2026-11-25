@@ -13,11 +13,11 @@ Every existing module (`payment-hub`, `g2p-config`, `vouchers`, `rbac`, `account
 ```
 src/modules/<module-name>/
 ├── types.ts                 # TypeScript interfaces for this domain
-├── mocks/
-│   └── <name>.mock.ts       # Mock data, used as a fallback when the API errors
 ├── <ModuleName>.tsx         # Main page component — breadcrumb + title + Tabs
 └── <Something>Tab.tsx       # One component per tab (e.g. MainBatchesTab.tsx)
 ```
+
+Modules don't carry mock data. Dev-server sample data, if a module has any, lives in `src/mocks/` (see [MOCK-DATA.md](MOCK-DATA.md)).
 
 Notes on what's real vs. aspirational here:
 
@@ -32,15 +32,15 @@ Notes on what's real vs. aspirational here:
 
 Create `src/modules/<name>/types.ts` with the interfaces for your domain's data shape. Match the field names and types your backend actually returns — including nullability. Existing modules model backend nulls explicitly rather than assuming fields are always present, e.g. `MainBatch.status: string | null` in `src/modules/payment-hub/types.ts`. Do the same for your module: if a field can come back `null` from the API, type it as `T | null`, not `T`.
 
-### Step 2 — Create Mock Data
+### Step 2 — Sample Data for the Dev Server (optional)
 
-Create `src/modules/<name>/mocks/<name>.mock.ts` exporting an array typed against your `types.ts` interface. This isn't throwaway scaffolding — it's the fallback the UI shows when the real API call fails (see Step 8), so keep it in sync with the type as the type evolves, and give it enough rows/variety to exercise your empty-state and pagination logic in development.
+If you want to work on the screen before its endpoint exists, or without a backend, add sample data and an MSW handler under `src/mocks/` (steps in [MOCK-DATA.md](MOCK-DATA.md#adding-sample-data)). The screen itself never imports it: it is served only by the dev server, only with `VITE_ENABLE_MSW=true`.
 
 ### Step 3 — Create API Function
 
-Add `src/lib/api/<name>.ts`. Decide whether your module talks to the **existing backend** (reuse the shared `apiClient` from `src/lib/api/client.ts`, which already injects the `Platform-TenantId` header and handles 401 → redirect-to-login) or a **different backend service** (create your own `axios.create({...})` instance in this file, following the pattern in `src/lib/api/g2pConfig.ts`).
+Add `src/lib/api/<name>.ts`. Decide whether your module talks to the **existing backend** (reuse the shared `apiClient` from `src/lib/api/client.ts`, which already sends the `Platform-TenantId` and `Authorization` headers, and on a 401 refreshes the token and retries before sending the user to login) or a **different backend service** (create your own `axios.create({...})` instance in this file, following the pattern in `src/lib/api/g2pConfig.ts`, and attach `createAuthInterceptors()` to it for the tenant and token headers).
 
-There's no shared factory for creating a new client — each `lib/api/<name>.ts` file just calls `axios.create()` directly if it needs its own instance. See the "Environment Variables" section below for naming the base URL.
+There's no shared client factory: each `lib/api/<name>.ts` file calls `axios.create()` itself if it needs its own instance, and shares the interceptors through `createAuthInterceptors()` (`src/lib/api/authInterceptors.ts`). See the "Environment Variables" section below for naming the base URL.
 
 ### Step 4 — Build the UI Component
 
@@ -71,7 +71,7 @@ Don't invent a "cards registry" or config-driven dashboard — it doesn't exist 
 
 ### Step 8 — Wire to Real API
 
-Swap the mock-only data source for the TanStack Query + mock-fallback pattern described below. Do this once you have a real endpoint to hit; until then, tabs can render straight from the mock array as vouchers/rbac currently do for some of their data.
+Fetch with TanStack Query as described in the "API Integration Pattern" section below. Until a backend exists, the screen shows `NotAvailable` (as vouchers and User Management do), not invented rows.
 
 ## Example — Adding a "Notifications" Module
 
@@ -90,32 +90,7 @@ export interface Notification {
 }
 ```
 
-**2. `src/modules/notifications/mocks/notifications.mock.ts`**
-
-```ts
-import type { Notification } from '../types'
-
-export const notifications: Notification[] = [
-  {
-    id: 1,
-    title: 'Batch BATCH-004-2026 failed',
-    message: '45 transactions failed validation.',
-    severity: 'CRITICAL',
-    createdAt: new Date('2026-06-04T14:05:00').getTime(),
-    readAt: null,
-  },
-  {
-    id: 2,
-    title: 'Nightly reconciliation complete',
-    message: 'All batches reconciled successfully.',
-    severity: 'INFO',
-    createdAt: new Date('2026-06-05T02:00:00').getTime(),
-    readAt: new Date('2026-06-05T08:12:00').getTime(),
-  },
-]
-```
-
-**3. `src/lib/api/notifications.ts`**
+**2. `src/lib/api/notifications.ts`**
 
 ```ts
 import apiClient from './client'
@@ -128,37 +103,33 @@ export const fetchNotifications = async () => {
 
 (This assumes notifications live on the same backend as Payment Hub, hence reusing `apiClient`. If it's a separate service, follow the `g2pConfig.ts` pattern instead — see Step 3.)
 
-**4. `src/modules/notifications/NotificationsTab.tsx`**
+**3. `src/modules/notifications/NotificationsTab.tsx`**
 
 ```tsx
 import { useQuery } from '@tanstack/react-query'
 import { fetchNotifications } from '@/lib/api/notifications'
-import { notifications as mockNotifications } from './mocks/notifications.mock'
 import type { Notification } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
+import LoadError from '@/components/shared/LoadError'
+import { formatTime } from '@/lib/formatTime'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { AlertCircle } from 'lucide-react'
 
 const SKELETON_ROWS = 5
 
 export default function NotificationsTab() {
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['notifications'],
     queryFn: fetchNotifications,
   })
 
-  const rows: Notification[] = isError ? mockNotifications : (apiData ?? [])
+  // No rows of our own: an error shows LoadError, an empty answer shows the empty state.
+  const rows: Notification[] = apiData ?? []
 
   return (
     <div className="space-y-4">
-      {isError && (
-        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-          <AlertCircle size={15} className="shrink-0" />
-          Could not reach the API — showing cached data.
-        </div>
-      )}
+      {isError && <LoadError what="notifications" error={error} />}
 
       <div className="rounded-lg border bg-white">
         <Table>
@@ -181,11 +152,19 @@ export default function NotificationsTab() {
                     ))}
                   </TableRow>
                 ))
-              : rows.map((n) => (
+              : rows.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      {isError ? 'No notifications loaded.' : 'No records found.'}
+                    </TableCell>
+                  </TableRow>
+                )
+                : rows.map((n) => (
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">{n.title}</TableCell>
                     <TableCell>{n.message}</TableCell>
-                    <TableCell>{n.createdAt ? new Date(n.createdAt).toLocaleString() : '-'}</TableCell>
+                    <TableCell>{formatTime(n.createdAt)}</TableCell>
                     <TableCell><StatusBadge status={n.severity} /></TableCell>
                   </TableRow>
                 ))}
@@ -197,7 +176,7 @@ export default function NotificationsTab() {
 }
 ```
 
-**5. `src/modules/notifications/Notifications.tsx`**
+**4. `src/modules/notifications/Notifications.tsx`**
 
 ```tsx
 import { Link } from 'react-router-dom'
@@ -228,13 +207,13 @@ export default function Notifications() {
 }
 ```
 
-**6. `src/pages/Notifications.tsx`**
+**5. `src/pages/Notifications.tsx`**
 
 ```ts
 export { default } from '@/modules/notifications/Notifications'
 ```
 
-**7. `src/main.tsx`** — add the import and route:
+**6. `src/main.tsx`** — add the import and route:
 
 ```tsx
 import Notifications from '@/pages/Notifications'
@@ -242,7 +221,7 @@ import Notifications from '@/pages/Notifications'
 { path: 'notifications', element: <Notifications /> },
 ```
 
-**8. `src/components/shared/AppLayout.tsx`** — add the sidebar entry:
+**7. `src/components/shared/AppLayout.tsx`** — add the sidebar entry:
 
 ```ts
 import { Bell } from 'lucide-react'
@@ -250,39 +229,37 @@ import { Bell } from 'lucide-react'
 { label: 'Notifications', path: '/notifications', icon: Bell },
 ```
 
-That's a complete, routable, mock-backed module. Wiring the real endpoint later is just implementing `fetchNotifications` against the live API — the component code doesn't change.
+That's a complete, routable module. With no backend it shows the error from `fetchNotifications`. To work on it without a backend, add sample data on the dev server (Step 2).
 
 ## API Integration Pattern
 
-Every data-fetching component in this app follows the same TanStack Query + mock-fallback shape, verbatim in `MainBatchesTab.tsx`, `G2PPaymentTab.tsx`, and `Dashboard.tsx`:
+Every data-fetching screen uses TanStack Query and shows one of five states, as `MainBatchesTab.tsx` and `Dashboard.tsx` do:
 
-```ts
-const { data: apiData, isLoading, isError } = useQuery({
+```tsx
+const { data: apiData, isLoading, isError, error } = useQuery({
   queryKey: ['mainBatches'],
   queryFn: fetchMainBatches,
 })
 
-// Fall back to mock data only when the API call fails
-const rows: MainBatch[] = isError ? mockBatches : (apiData?.data ?? [])
+const rows: MainBatch[] = apiData?.data ?? []
+
+{isError && <LoadError what="batches" error={error} />}
+// in the table body: skeleton while isLoading; 'No records found.' when rows is empty
 ```
 
-Two details matter here and are easy to get wrong by copying an older/incorrect version of this pattern:
+| State | Show |
+|---|---|
+| Loading | A skeleton: pulsing `<div>`s matching the table's column count (`SKELETON_ROWS`), not a spinner |
+| Data | The rows |
+| Empty answer | "No records found." (or "No … loaded." when the call failed) |
+| Error | `LoadError` (`src/components/shared/LoadError.tsx`): `Could not load <what>: <HTTP status or message>`, and no rows |
+| No backend yet | `NotAvailable` from the same file: `<what> not available: Payment Hub has no backend for this yet` |
 
-- **Fall back on `isError`, not on an empty result.** An earlier version of this pattern checked `apiData?.data?.length ? apiData.data : mockData`, which silently substituted mock rows whenever the API returned a legitimate empty array — indistinguishable from "API is down" and meaning "No records found" could never actually render. Always gate the fallback on `isError`.
-- **Show an inline error banner when `isError` is true**, so the user knows they're looking at cached/mock data rather than assuming it's live:
+Rules, all from bugs this codebase has had:
 
-```tsx
-{isError && (
-  <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-    <AlertCircle size={15} className="shrink-0" />
-    Could not reach the API — showing cached data.
-  </div>
-)}
-```
-
-This banner markup is currently copy-pasted per component rather than extracted into a shared component — follow the existing pattern rather than introducing a new shared `<ApiErrorBanner>` unless you're prepared to also migrate the existing call sites.
-
-Loading state uses a skeleton, not a spinner — an array of pulsing `<div>`s matching the table's column count, shown while `isLoading` is true (see the `SKELETON_ROWS` pattern in the example above).
+- **Never substitute rows of your own,** not on an error and not on an empty answer. Earlier versions showed bundled mock rows under "showing cached data" when a call failed, and before that whenever the answer was empty. Real faults (a 401, a wrong URL) looked like working screens. `noMockFallback.test.tsx` checks the payment-hub screens for this.
+- **A write that fails reports failure.** Use the mutation's error (`useMutation`'s `onError`, or let the API function throw); never show a success message the backend didn't confirm.
+- **Format amounts and times** with `formatAmount()` and `formatTime()`.
 
 ## StatusBadge Extension
 
@@ -310,9 +287,10 @@ New backend service URLs follow the naming convention `VITE_<SERVICE_NAME>_URL` 
 
 To add one:
 
-1. Add the key (with a value) to your local `.env`.
+1. Add the key (with a value) to your local env file (`.env.development` or `.env.g2p`).
 2. Add the same key (blank) to `.env.example` so other developers know it's needed.
-3. Reference it directly as `import.meta.env.VITE_YOUR_SERVICE_URL` in your `src/lib/api/<name>.ts` file — see `g2pConfig.ts`'s `axios.create({ baseURL: import.meta.env.VITE_G2P_SERVICE_URL || 'http://localhost:8084' })` for the pattern, including a local-dev fallback default.
+3. Read it with `getEnv('VITE_YOUR_SERVICE_URL')` (`src/lib/runtime-config.ts`) in your `src/lib/api/<name>.ts` file. See `g2pConfig.ts`'s `axios.create({ baseURL: getEnv('VITE_G2P_SERVICE_URL') || 'http://localhost:8084' })`, including a local-dev fallback default.
+4. Add it to `docker/docker-entrypoint.sh`, so a deployment can set it at container start without a rebuild.
 
 There is **no `vite-env.d.ts` with a typed `ImportMetaEnv` interface** in this repo — env var access is untyped (effectively `string | undefined`), and TypeScript won't catch a typo'd variable name or a missing one at compile time. If you're adding several new env vars for a large module, consider adding a `vite-env.d.ts` with a typed `ImportMetaEnv` as a small standalone improvement — but that's a repo-wide change, not something to bolt on silently as part of one module's PR.
 
