@@ -1,8 +1,9 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
-import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
-import type { BatchTransaction } from './types'
+import { fetchMainBatches, fetchBatchSummary, fetchBatchTransfers } from '@/lib/api/paymentHub'
+import type { BatchTransfer } from './types'
+import SubBatchTable from './SubBatchTable'
 import StatusBadge from '@/components/shared/StatusBadge'
 import LoadError from '@/components/shared/LoadError'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,13 +15,10 @@ import { formatAmount } from '@/lib/formatAmount'
 import { formatTime, withTimeZone } from '@/lib/formatTime'
 
 const SKELETON_ROWS = 5
+const TRANSFER_COLUMNS = 6
 
 const formatField = (value: string | null | undefined) =>
   !value || value === 'null' ? '-' : value
-
-function toRows(data: Record<string, string>): BatchTransaction[] {
-  return Object.entries(data).map(([transactionId, status]) => ({ transactionId, status }))
-}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -54,13 +52,20 @@ export default function BatchDetail() {
   const batches = batchData?.data ?? []
   const batch = batches.find((b) => b.batchId === batchId)
 
-  const { data: transactionsData, isLoading: isTransactionsLoading, isError: isTransactionsError, error: transactionsError } = useQuery({
-    queryKey: ['batchTransactions', batchId],
-    queryFn: () => fetchBatchTransactions(batchId!),
+  // Transfers of every kind of batch: Mojaloop ones are stored under their sub-batch's ID, so
+  // GET /batch/transactions alone listed none of them (PHEE-468; see fetchBatchTransfers).
+  const { data: transfersData, isLoading: isTransactionsLoading, isError: isTransactionsError, error: transactionsError } = useQuery({
+    queryKey: ['batchTransfers', batchId],
+    queryFn: () => fetchBatchTransfers(batchId!),
     enabled: !!batchId,
   })
+  const transactions: BatchTransfer[] = transfersData ?? []
 
-  const transactions: BatchTransaction[] = toRows(transactionsData ?? {})
+  const { data: summary, isLoading: isSummaryLoading, isError: isSummaryError, error: summaryError } = useQuery({
+    queryKey: ['batchSummary', batchId],
+    queryFn: () => fetchBatchSummary(batchId!),
+    enabled: !!batchId,
+  })
 
   return (
     <div className="space-y-6">
@@ -96,7 +101,7 @@ export default function BatchDetail() {
         <StatCard label="Total Amount" value={formatAmount(batch?.totalAmount ?? null)} />
       </div>
 
-      {/* Batch info + Transactions */}
+      {/* Batch info + Sub-batches */}
       <div className="flex gap-4 items-start">
         {/* Batch Info */}
         <Card className="flex-1 min-w-0">
@@ -113,55 +118,85 @@ export default function BatchDetail() {
           </CardContent>
         </Card>
 
-        {/* Batch Transactions */}
+        {/* Sub-batches */}
         <Card className="flex-2 min-w-0">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-700">Transactions</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">Sub-batches</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {isTransactionsError && (
+            {isSummaryError && (
               <div className="px-6 pb-3">
-                <LoadError what="the batch's transactions" error={transactionsError} />
+                <LoadError what="the batch's sub-batches" error={summaryError} />
               </div>
             )}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Transaction ID</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isTransactionsLoading
-                  ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: 2 }).map((__, j) => (
-                          <TableCell key={j}>
-                            <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  : transactions.length > 0
-                    ? transactions.map((t) => (
-                        <TableRow key={t.transactionId}>
-                          <TableCell className="font-medium">{t.transactionId}</TableCell>
-                          <TableCell><StatusBadge status={t.status} /></TableCell>
-                        </TableRow>
-                      ))
-                    : (
-                        <TableRow>
-                          <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
-                            {isTransactionsError ? 'No transactions loaded.' : 'No transactions found.'}
-                          </TableCell>
-                        </TableRow>
-                      )
-                }
-              </TableBody>
-            </Table>
+            <SubBatchTable
+              subBatches={summary?.subBatchSummaryList ?? []}
+              isLoading={isSummaryLoading}
+              emptyText={isSummaryError ? 'No sub-batches loaded.' : 'This batch has no sub-batches.'}
+              compact
+            />
           </CardContent>
         </Card>
       </div>
+
+      {/* Transactions */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-gray-700">
+            Transactions{transfersData ? ` (${transactions.length})` : ''}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isTransactionsError && (
+            <div className="px-6 pb-3">
+              <LoadError what="the batch's transactions" error={transactionsError} />
+            </div>
+          )}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Transaction ID</TableHead>
+                <TableHead>Payee</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Sub-batch</TableHead>
+                <TableHead>{withTimeZone('Completed')}</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isTransactionsLoading
+                ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: TRANSFER_COLUMNS }).map((__, j) => (
+                        <TableCell key={j}>
+                          <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                : transactions.length > 0
+                  ? transactions.map((t) => (
+                      <TableRow key={t.transactionId}>
+                        <TableCell className="font-medium">{t.transactionId}</TableCell>
+                        <TableCell>{formatField(t.payeeFunctionalId)}</TableCell>
+                        <TableCell className="text-right">{formatAmount(t.amount)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{formatField(t.subBatchId)}</TableCell>
+                        <TableCell>{formatTime(t.completedAt)}</TableCell>
+                        <TableCell><StatusBadge status={t.status} /></TableCell>
+                      </TableRow>
+                    ))
+                  : (
+                      <TableRow>
+                        <TableCell colSpan={TRANSFER_COLUMNS} className="text-center text-muted-foreground py-8">
+                          {isTransactionsError ? 'No transactions loaded.' : 'No transactions found.'}
+                        </TableCell>
+                      </TableRow>
+                    )
+              }
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   )
 }

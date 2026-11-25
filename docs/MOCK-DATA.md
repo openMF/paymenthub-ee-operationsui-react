@@ -61,13 +61,14 @@ MSW is started with `onUnhandledRequest: 'bypass'`: a request no handler matches
 |---|---|---|
 | `GET */batches` (`paymentHub.handlers.ts`) | `src/mocks/data/mainBatches.ts`, 10 batches | Main Batches, Sub Batches, Dashboard, Reporting |
 | `GET */transfers` | `src/mocks/data/transfers.ts` | Transfers, Reporting |
-| `GET */batch/transactions?batchId=…` | `src/mocks/data/batchTransactions.ts`, keyed by batch id | Batch detail |
+| `GET */batches/:batchId` (with `?associations=all`: its transfers, paged by `offset`/`limit`) | one sample Mojaloop sub-batch per batch; transfers from `src/mocks/data/batchTransactions.ts` | Sub Batches, Batch Detail |
+| `GET */batch/transactions` | an empty answer (the samples are Mojaloop batches, whose transfers the BFF lists under their sub-batch) | Batch Detail |
 | `GET */beneficiaries` | `src/mocks/data/beneficiaries.ts`, returned in account-mapper's shape | Account Mapper list |
 | `GET`/`POST http://localhost:8084/g2pPaymentConfig`, `GET …/governmentEntity`, `…/program`, `…/dfsp` (`g2p.handlers.ts`) | inline in the handler | G2P Config |
 
 Things to know:
 
-- **The Payment Hub handlers match any host** (`*/batches`). With MSW on, these four endpoints return sample data even if `VITE_API_BASE_URL` points at a real Gazelle.
+- **The Payment Hub handlers match any host** (`*/batches`). With MSW on, these endpoints return sample data even if `VITE_API_BASE_URL` points at a real Gazelle.
 - **The G2P handlers match only `http://localhost:8084`**, the default in `src/lib/api/g2pConfig.ts`. If `VITE_G2P_SERVICE_URL` is set to another URL, those requests go there and are not mocked.
 - **Not mocked:**
   - beneficiary create and update (`POST`/`PUT /beneficiaries`)

@@ -41,7 +41,7 @@ npm test -- --run    # once, as CircleCI does
 npm run test:coverage
 ```
 
-What is covered today (16 files, 82 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; `mockDataGate.test.ts` (sample data only behind the config check); `Settings.test.tsx` (only the default tenant is saved, and only reported saved when it was); and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
+What is covered today (18 files, 91 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; `mockDataGate.test.ts` (sample data only behind the config check); `Settings.test.tsx` (only the default tenant is saved, and only reported saved when it was); `paymentHub.test.ts` and `BatchDetail.test.tsx` (a batch's transfers from both places the BFF keeps them, paging, and its sub-batches); and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
 
 For any component you touch that fetches data, test or at least check by hand its four states: loading skeleton, data, empty result, and error (`LoadError`). These are where this codebase's past bugs clustered. A test can set up the API's answer with `vi.mock()` of the API module (as `noMockFallback.test.tsx` does) or with an `msw/node` server (as `accountMapper.test.ts` does).
 
@@ -81,9 +81,9 @@ When wiring a module to a real backend (Step 8 in `docs/EXTENSIBILITY.md`), work
 Documenting these plainly so they're treated as known debt rather than rediscovered as surprises:
 
 - **Few component tests.** See "Testing Approach" above.
+- **Closedloop transfers show status only on Batch Detail.** The BFF keeps closedloop transfers under the batch's own ID, and the only endpoint that finds them there (`/batch/transactions`) returns their status alone; Mojaloop transfers come with amount and payee (`fetchBatchTransfers` in `src/lib/api/paymentHub.ts`).
 - **Figures from the first page only.** Batches are fetched without `offset`/`limit` (the BFF returns 10) and transfers as one page of 20, so the Dashboard and Reporting totals, the Main Batches and Transfers lists, their filters and exports cover only that page. The batches response carries real totals (`totalBatches`, `totalAmount`, …) that aren't used yet.
 - **Switching tenant in the header doesn't refetch.** Query keys don't include the tenant, so the current screen keeps the previous tenant's data until it is fetched again.
-- **Sub Batches and Batch Detail:** the Sub Batches tab lists a batch's transactions, not its sub-batches, and Batch Detail lists no transfers for batches whose transfers are stored under sub-batch IDs (Mojaloop batches).
 - **G2P types don't match the BFF.** The BFF sends `configId`, `account` and nested `governmentEntity` / `dfsp` / `program` objects with their own IDs; the UI expects flat `{ id, name }` records. Create can't save until this is fixed.
 - **Controls with no function:** the header's language select and notification, search and help icons, and the login screen's "Remember me".
 - **Lint isn't clean or run automatically.** 13 problems on `dev`; see "PR Process".

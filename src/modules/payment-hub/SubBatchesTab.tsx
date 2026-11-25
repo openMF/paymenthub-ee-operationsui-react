@@ -1,16 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { fetchMainBatches, fetchBatchTransactions } from '@/lib/api/paymentHub'
-import type { MainBatch, BatchTransaction } from './types'
-import StatusBadge from '@/components/shared/StatusBadge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { fetchMainBatches, fetchBatchSummary } from '@/lib/api/paymentHub'
+import type { MainBatch, SubBatchSummary } from './types'
+import SubBatchTable from './SubBatchTable'
 import {
   Select,
   SelectContent,
@@ -19,50 +12,41 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import LoadError from '@/components/shared/LoadError'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
+import { formatAmount } from '@/lib/formatAmount'
+import { formatTime } from '@/lib/formatTime'
 
-const SKELETON_ROWS = 5
-
-function toRows(data: Record<string, string>): BatchTransaction[] {
-  return Object.entries(data).map(([transactionId, status]) => ({ transactionId, status }))
-}
-
+// A batch's sub-batches (GET /batches/{batchId}). This tab used to list the chosen batch's
+// transactions from GET /batch/transactions, which is empty for Mojaloop batches: their transfers
+// are stored under the sub-batch's ID (PHEE-468). The batch's transfers are on its Batch Detail page.
 export default function SubBatchesTab() {
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(10)
-
+  const navigate = useNavigate()
   const { data: mainBatchesData, isError: isBatchesError, error: batchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
   const batchOptions: MainBatch[] = mainBatchesData?.data ?? []
-  const [batchId, setBatchId] = useState<string>('')
+  const [chosen, setChosen] = useState<string>('')
+  // Until one is picked, the newest batch (the BFF lists newest first).
+  const batchId = chosen || batchOptions[0]?.batchId || ''
 
-  useEffect(() => {
-    if (!batchId && batchOptions.length > 0) {
-      setBatchId(batchOptions[0].batchId)
-    }
-  }, [batchId, batchOptions])
-
-  const { data: apiData, isLoading, isError, error } = useQuery({
-    queryKey: ['batchTransactions', batchId],
-    queryFn: () => fetchBatchTransactions(batchId),
+  const { data: summary, isLoading, isError, error } = useQuery({
+    queryKey: ['batchSummary', batchId],
+    queryFn: () => fetchBatchSummary(batchId),
     enabled: !!batchId,
   })
 
-  const rows: BatchTransaction[] = toRows(apiData ?? {})
+  const rows: SubBatchSummary[] = summary?.subBatchSummaryList ?? []
 
-  const totalPages = Math.max(1, Math.ceil(rows.length / perPage))
-  const paginated = rows.slice((page - 1) * perPage, page * perPage)
-
-  const exportRows: Record<string, unknown>[] = rows.map((t) => ({
-    'Transaction ID': t.transactionId,
-    Status: t.status,
-  }))
+  const exportHeaders = ['Sub-batch ID', 'Payment Mode', 'Payee FSP', 'Transactions', 'Completed', 'Failed', 'Amount', 'Started', 'Status']
+  const exportCells = (s: SubBatchSummary) => [
+    s.subBatchId, s.modes ?? '', s.payeeFspSet?.join(' ') ?? '', s.total ?? 0, s.successful ?? 0, s.failed ?? 0,
+    formatAmount(s.totalAmount), formatTime(s.startedAt), s.status ?? '',
+  ]
 
   return (
     <div className="space-y-4">
@@ -70,24 +54,30 @@ export default function SubBatchesTab() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground">Batch</span>
-          <Select
-            value={batchId}
-            onValueChange={(v) => { setBatchId(v); setPage(1) }}
-          >
-            <SelectTrigger className="w-56"><SelectValue placeholder="Select a batch" /></SelectTrigger>
+          <Select value={batchId} onValueChange={setChosen}>
+            <SelectTrigger className="w-80"><SelectValue placeholder="Select a batch" /></SelectTrigger>
             <SelectContent>
               {batchOptions.map((b) => (
                 <SelectItem key={b.batchId} value={b.batchId}>{b.batchId}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {batchId && (
+            <Button variant="link" size="sm" className="text-xs" onClick={() => navigate(`/payment-hub/batch/${batchId}`)}>
+              View the batch's transactions
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={() => exportCsv(exportRows, `batch-transactions-${csvDate()}.csv`)}
+            disabled={rows.length === 0}
+            onClick={() => exportCsv(
+              rows.map((s) => Object.fromEntries(exportHeaders.map((h, i) => [h, exportCells(s).at(i)]))),
+              `sub-batches-${csvDate()}.csv`,
+            )}
           >
             <Download size={13} />
             Export CSV
@@ -96,12 +86,8 @@ export default function SubBatchesTab() {
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs"
-            onClick={() => exportPdf(
-              'Batch Transactions',
-              ['Transaction ID', 'Status'],
-              rows.map((t) => [t.transactionId, t.status]),
-              `batch-transactions-${csvDate()}.pdf`,
-            )}
+            disabled={rows.length === 0}
+            onClick={() => exportPdf('Sub-batches', exportHeaders, rows.map(exportCells), `sub-batches-${csvDate()}.pdf`)}
           >
             <FileText size={13} />
             Export PDF
@@ -109,94 +95,15 @@ export default function SubBatchesTab() {
         </div>
       </div>
 
-      {/* Error banner */}
       {isBatchesError && <LoadError what="batches" error={batchesError} />}
-      {isError && <LoadError what="the batch's transactions" error={error} />}
+      {isError && <LoadError what="the batch's sub-batches" error={error} />}
 
-      {/* Table */}
       <div className="rounded-lg border bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Transaction ID</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading
-              ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 2 }).map((__, j) => (
-                      <TableCell key={j}>
-                        <div className="h-4 rounded bg-gray-100 animate-pulse w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              : paginated.length > 0
-                ? paginated.map((t) => (
-                    <TableRow key={t.transactionId}>
-                      <TableCell className="font-medium">{t.transactionId}</TableCell>
-                      <TableCell><StatusBadge status={t.status} /></TableCell>
-                    </TableRow>
-                  ))
-                : (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
-                        {isError || isBatchesError ? 'No transactions loaded.' : 'No records found.'}
-                      </TableCell>
-                    </TableRow>
-                  )
-            }
-          </TableBody>
-        </Table>
-
-        {/* Pagination */}
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Items per page</span>
-            <Select
-              value={String(perPage)}
-              onValueChange={(v) => {
-                setPerPage(Number(v))
-                setPage(1)
-              }}
-            >
-              <SelectTrigger className="w-17.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>
-              {rows.length === 0
-                ? '0–0 of 0'
-                : `${(page - 1) * perPage + 1}–${Math.min(page * perPage, rows.length)} of ${rows.length}`
-              }
-            </span>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              <ChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              <ChevronRight />
-            </Button>
-          </div>
-        </div>
+        <SubBatchTable
+          subBatches={rows}
+          isLoading={isLoading && !!batchId}
+          emptyText={isError || isBatchesError ? 'No sub-batches loaded.' : 'This batch has no sub-batches.'}
+        />
       </div>
     </div>
   )
