@@ -180,7 +180,7 @@ export default function Reporting() {
         </Card>
       </div>
 
-      {/* Row 3 — no backend yet: amount by ministry, failure rate by DFSP */}
+      {/* Row 3 — not connected yet: amount by ministry, failure rate by DFSP */}
       <div className="flex gap-4">
         <Card className="flex-1 min-w-0">
           <CardHeader className="pb-2">

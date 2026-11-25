@@ -27,8 +27,8 @@ describe('LoadError', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load batches: HTTP 403 Forbidden')
   })
 
-  it('renders "not available" for a screen with no backend', () => {
+  it('renders "not available" for a screen that is not connected yet', () => {
     render(<NotAvailable what="Vouchers are" />)
-    expect(screen.getByRole('status')).toHaveTextContent('Vouchers are not available')
+    expect(screen.getByRole('status')).toHaveTextContent("Vouchers are not available yet: this screen isn't connected to Payment Hub.")
   })
 })
