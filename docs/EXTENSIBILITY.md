@@ -253,7 +253,7 @@ const rows: MainBatch[] = apiData?.data ?? []
 | Data | The rows |
 | Empty answer | "No records found." (or "No … loaded." when the call failed) |
 | Error | `LoadError` (`src/components/shared/LoadError.tsx`): `Could not load <what>: <HTTP status or message>`, and no rows |
-| No backend yet | `NotAvailable` from the same file: `<what> not available: Payment Hub has no backend for this yet` |
+| Not connected yet | `NotAvailable` from the same file: `<what> not available yet: this screen isn't connected to Payment Hub` |
 
 Rules, all from bugs this codebase has had:
 

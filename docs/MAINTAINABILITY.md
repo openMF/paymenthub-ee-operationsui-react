@@ -41,7 +41,7 @@ npm test -- --run    # once, as CircleCI does
 npm run test:coverage
 ```
 
-What is covered today (14 files, 72 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; `mockDataGate.test.ts` (sample data only behind the config check); and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
+What is covered today (15 files, 81 tests): amount, time and CSV formatting; the Keycloak token refresh, idle timer and auth interceptors; the account-mapper API calls; `StatusBadge`; `LoadError`; the payment-hub types; `mockDataGate.test.ts` (sample data only behind the config check); `Settings.test.tsx` (only the default tenant is saved, and only reported saved when it was); and `noMockFallback.test.tsx`, which checks that a failed call shows the error and no sample rows, and that an empty answer shows "No records found." Most screens have no component test.
 
 For any component you touch that fetches data, test or at least check by hand its four states: loading skeleton, data, empty result, and error (`LoadError`). These are where this codebase's past bugs clustered. A test can set up the API's answer with `vi.mock()` of the API module (as `noMockFallback.test.tsx` does) or with an `msw/node` server (as `accountMapper.test.ts` does).
 
@@ -51,7 +51,7 @@ For any component you touch that fetches data, test or at least check by hand it
 - `VITE_ENABLE_MSW` is the exception: `main.tsx` reads it from `import.meta.env`, and only on the dev server, so a deployed image can't turn mock data on. `VITE_TENANT_ID` and `VITE_BULK_CONNECTOR_URL` are in `.env.example` and the entrypoint but no code reads them yet.
 - **No typed `ImportMetaEnv`** — there's no `vite-env.d.ts` augmenting the env var types, so a typo'd or missing `VITE_*` reference won't be caught by TypeScript; it'll just resolve to `undefined` at runtime. Double-check env var names by hand when adding or renaming one.
 - Whenever you add a new env var, update **both** your local env file (`.env.development` or `.env.g2p`, gitignored) and `.env.example` (committed) — a var only in `.env` means every other developer's checkout silently lacks it with no error, just a broken feature.
-- Multi-tenancy: the app reads a `tenant` value from `localStorage` (defaulting to `greenbank`), set from the login screen, the header or Settings, and sends it as a `Platform-TenantId` header from the shared request interceptor (`createAuthInterceptors()` in `src/lib/api/authInterceptors.ts`, used by `client.ts` and `g2pConfig.ts`). If your module's backend is tenant-scoped and you're using the shared `apiClient`, this is handled for you automatically; if you create a separate axios instance, attach `createAuthInterceptors()` to it as `g2pConfig.ts` does.
+- Multi-tenancy: the app reads a `tenant` value from `localStorage` (defaulting to `greenbank`), set from the login screen or the header (Settings only sets `defaultTenant`, the tenant the login screen starts with: `src/lib/defaultTenant.ts`), and sends it as a `Platform-TenantId` header from the shared request interceptor (`createAuthInterceptors()` in `src/lib/api/authInterceptors.ts`, used by `client.ts` and `g2pConfig.ts`). If your module's backend is tenant-scoped and you're using the shared `apiClient`, this is handled for you automatically; if you create a separate axios instance, attach `createAuthInterceptors()` to it as `g2pConfig.ts` does.
 
 ## Mock Data Strategy
 
@@ -82,9 +82,8 @@ Documenting these plainly so they're treated as known debt rather than rediscove
 
 - **Few component tests.** See "Testing Approach" above.
 - **Lint isn't clean or run automatically.** 13 problems on `dev`; see "PR Process".
-- **Settings saves nothing.** Its Save buttons show "Settings saved successfully" but store no value.
 - **Role cards are fixed text.** RBAC's Role Configuration cards are defined in `RoleConfigTab.tsx`, not read from Keycloak, and not enforced (see the next item).
-- **Screens with no backend yet:** vouchers (and the Dashboard's recent vouchers), User Management, and Reporting's ministry and DFSP charts show "not available".
+- **Screens not connected yet:** vouchers (and the Dashboard's recent vouchers), User Management, Reporting's ministry and DFSP charts, and Settings' images, theme and contact sections show "not available". For some a backend exists but isn't wired in: the BFF serves `/api/v1/users`, `/roles` and `/permissions`, and the vouchers service has a `/vouchers` API but no ingress.
 - **No RBAC enforcement.** `useAuth().hasRole` exists but is not called anywhere except its own definition — every authenticated user can reach every route and action regardless of their Keycloak role. See `docs/EXTENSIBILITY.md`'s "Keycloak RBAC" section if you need to actually gate something.
 - **Dead sidebar link.** `AppLayout.tsx`'s `navItems` includes "Audit Trails" pointing at `/audit`, which is not registered in `src/main.tsx` — clicking it renders the catch-all `NotFound` page. Either register the route or remove the nav entry.
 - **Duplicate sidebar targets.** "Users" and "Roles & Permissions" both link to `/rbac` — there's a single RBAC page with tabs, but two separate nav entries pointing at the same URL rather than one entry, or two entries deep-linking to specific tabs.

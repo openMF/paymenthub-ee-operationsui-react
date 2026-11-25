@@ -14,6 +14,7 @@ import {
 import { getEnv } from '@/lib/runtime-config'
 import { useToast } from '@/components/shared/ToastProvider'
 import { persistTokens } from '@/lib/keycloak/keycloak'
+import { readDefaultTenant } from '@/lib/defaultTenant'
 
 const TENANTS = ['greenbank', 'bluebank', 'redbank']
 
@@ -26,7 +27,8 @@ export default function Login() {
   const { toast } = useToast()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [tenant, setTenant] = useState('')
+  // Starts with the default tenant chosen in Settings, if any.
+  const [tenant, setTenant] = useState(() => readDefaultTenant() ?? '')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)

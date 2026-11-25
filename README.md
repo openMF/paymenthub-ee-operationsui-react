@@ -27,12 +27,12 @@
 
 - **Dashboard** — operational overview with KPI stats, recent batches, quick actions (recent vouchers: not available yet)
 - **Payment Hub** — Main Batches, Sub Batches, Transfers with status filters, CSV/PDF export
-- **Voucher Management** — screens built, but they show "not available": Payment Hub has no voucher backend for them yet
+- **Voucher Management** — screens built, but they show "not available": the vouchers service has an API, but the UI isn't connected to it yet
 - **Account Mapper** — beneficiary management, create beneficiary form, self-service portal
 - **G2P Payment Config** — configuration list and create form
-- **RBAC** — role cards (fixed in the code, not read from Keycloak, and not enforced: see [docs/MAINTAINABILITY.md](docs/MAINTAINABILITY.md#known-limitations)); user management shows "not available" (no backend yet)
+- **RBAC** — role cards (fixed in the code, not read from Keycloak, and not enforced: see [docs/MAINTAINABILITY.md](docs/MAINTAINABILITY.md#known-limitations)); user management shows "not available" (the BFF's `/api/v1/users` isn't wired in yet)
 - **Reporting Dashboard** — Recharts charts and KPI metrics from batches and transfers, failed batch table (the ministry and DFSP charts: not available yet)
-- **Settings** — app configuration form with accordion sections. Its Save buttons store nothing yet, although they say "Settings saved successfully"
+- **Settings** — the deployment's running configuration (read-only) and a default tenant for the login screen, saved in the browser. Images, theme and contact sections show "not available"
 - **In-app Keycloak authentication** — ROPC flow, token stored in `localStorage`, JWT expiry validation
 - **Animated splash screen** — shimmer progress bar, auto-navigates to login
 

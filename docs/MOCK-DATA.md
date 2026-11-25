@@ -7,7 +7,7 @@ The app never shows sample data in place of Payment Hub's. A screen shows one of
 | The call succeeded and returned rows | Payment Hub's data |
 | The call succeeded and returned nothing | An empty state ("No records found.") |
 | The call failed | What failed and why, for example `Could not load batches: HTTP 401 Unauthorized`, and no rows (`LoadError` in `src/components/shared/LoadError.tsx`) |
-| Payment Hub has no backend for the screen yet | "… not available: Payment Hub has no backend for this yet" (`NotAvailable`, same file) |
+| The screen isn't connected to Payment Hub yet | "… not available yet: this screen isn't connected to Payment Hub" (`NotAvailable`, same file) |
 
 A write that fails reports the failure. It never reports success.
 
@@ -74,7 +74,7 @@ Things to know:
   - the Self Service Portal (`GET /beneficiary/{id}`, `PUT /identityAccountMapper/beneficiary`)
   
   These go to `VITE_API_BASE_URL`. With no backend, they fail and show their error.
-- **Vouchers, User Management and the two Reporting charts** show "not available" with or without MSW. Payment Hub has no backend for them, so there is nothing to mock.
+- **Vouchers, User Management, the two Reporting charts and Settings' images, theme and contact sections** show "not available" with or without MSW. The UI doesn't call anything for them yet, so there is nothing to mock.
 - **Login is not mocked.** Every route except `/splash`, `/login` and the Self Service Portal needs a Keycloak login, so mock mode still needs a Keycloak. Use the local one from the README's [Keycloak setup](../README.md#keycloak-setup-local-docker), or any Keycloak with the `paymenthub` realm and the `opsapp` client.
 
 ## Tests
