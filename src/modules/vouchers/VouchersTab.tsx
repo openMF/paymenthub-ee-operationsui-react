@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { fetchVouchers } from '@/lib/api/vouchers'
-import { vouchers as mockVouchers } from './mocks/vouchers.mock'
 import type { Voucher } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
+import { NotAvailable } from '@/components/shared/LoadError'
 import {
   Table,
   TableBody,
@@ -49,13 +47,9 @@ export default function VouchersTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['vouchers'],
-    queryFn: fetchVouchers,
-  })
-
-  // Fall back to mock data if the response has no content
-  const rows: Voucher[] = data?.content?.length ? data.content : mockVouchers
+  // No vouchers backend is wired to the Operations UI yet (it showed bundled sample vouchers).
+  const isLoading = false
+  const rows: Voucher[] = []
 
   const filtered = rows.filter(
     (v) => statusFilter === 'all' || v.status === statusFilter
@@ -66,6 +60,8 @@ export default function VouchersTab() {
 
   return (
     <div className="space-y-4">
+      <NotAvailable what="Vouchers are" />
+
       {/* Filter chips */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
@@ -166,7 +162,7 @@ export default function VouchersTab() {
                 : (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        No records found.
+                        Not available.
                       </TableCell>
                     </TableRow>
                   )

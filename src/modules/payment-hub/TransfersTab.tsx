@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchTransfers } from '@/lib/api/paymentHub'
-import { transfers as mockTransfers } from './mocks/transfers.mock'
 import type { Transfer } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -11,7 +10,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import LoadError from '@/components/shared/LoadError'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 import { formatAmount } from '@/lib/formatAmount'
@@ -30,12 +30,12 @@ export default function TransfersTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['transfers'],
     queryFn: fetchTransfers,
   })
 
-  const rows: Transfer[] = isError ? mockTransfers : (apiData?.content ?? [])
+  const rows: Transfer[] = apiData?.content ?? []
   const totalCount: number = apiData?.totalElements ?? rows.length
 
   const payers = [...new Set(rows.map((t) => t.payerDfspId).filter((p): p is string => !!p && p !== 'null'))]
@@ -118,12 +118,7 @@ export default function TransfersTab() {
       </div>
 
       {/* Error banner */}
-      {isError && (
-        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-          <AlertCircle size={15} className="shrink-0" />
-          Could not reach the API — showing cached data.
-        </div>
-      )}
+      {isError && <LoadError what="transfers" error={error} />}
 
       {/* Table */}
       <div className="rounded-lg border bg-white">
@@ -165,7 +160,7 @@ export default function TransfersTab() {
                 : (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                        No records found.
+                        {isError ? 'No transfers loaded.' : 'No records found.'}
                       </TableCell>
                     </TableRow>
                   )

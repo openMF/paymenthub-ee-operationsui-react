@@ -1,8 +1,11 @@
 import { UploadCloud } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { NotAvailable } from '@/components/shared/LoadError'
 
 export default function CreateVouchersTab() {
   return (
+    <div className="space-y-4">
+    <NotAvailable what="Voucher upload is" />
     <div className="flex items-center justify-center py-16">
       <div className="flex flex-col items-center gap-4 rounded-2xl border bg-white px-12 py-10 shadow-sm text-center">
         <div className="rounded-full bg-blue-50 p-4">
@@ -14,13 +17,11 @@ export default function CreateVouchersTab() {
             Upload a CSV file to create multiple vouchers at once
           </p>
         </div>
-        <Button asChild className="bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2">
-          <label>
-            Choose File to Upload
-            <input type="file" accept=".csv,text/csv" className="hidden" />
-          </label>
+        <Button disabled className="bg-[#1565C0] hover:bg-[#0d47a1] text-white mt-2">
+          Choose File to Upload
         </Button>
       </div>
+    </div>
     </div>
   )
 }

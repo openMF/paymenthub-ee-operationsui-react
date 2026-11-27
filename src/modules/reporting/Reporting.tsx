@@ -1,48 +1,18 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   LineChart, Line,
-  BarChart, Bar,
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from 'recharts'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import StatusBadge from '@/components/shared/StatusBadge'
+import LoadError, { NotAvailable } from '@/components/shared/LoadError'
 import { fetchMainBatches, fetchTransfers } from '@/lib/api/paymentHub'
-import { mainBatches as mockBatches } from '@/modules/payment-hub/mocks/mainBatches.mock'
-import { transfers as mockTransfers } from '@/modules/payment-hub/mocks/transfers.mock'
 import type { MainBatch } from '@/modules/payment-hub/types'
 import { formatAmount } from '@/lib/formatAmount'
 import { formatTime, withTimeZone } from '@/lib/formatTime'
-
-// ── Mock data (fallback for charts with no real endpoint yet) ──────────────
-
-const ministryData = [
-  { ministry: 'Finance',    amount: 560 },
-  { ministry: 'Health',     amount: 320 },
-  { ministry: 'Education',  amount: 410 },
-  { ministry: 'Agriculture',amount: 190 },
-  { ministry: 'Transport',  amount: 280 },
-  { ministry: 'Rural Dev',  amount: 230 },
-]
-
-const dfspData = [
-  { dfsp: 'GreenBank', rate: 8.2 },
-  { dfsp: 'BlueBank',  rate: 14.7 },
-  { dfsp: 'RedBank',   rate: 19.3 },
-  { dfsp: 'HDFC',      rate: 6.1 },
-  { dfsp: 'SBI',       rate: 11.5 },
-]
-
-const TENANTS = ['greenbank', 'bluebank', 'redbank']
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: '#22c55e',
@@ -110,22 +80,18 @@ function KpiCard({ label, value, trend, isLoading }: { label: string; value: str
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function Reporting() {
-  const [fromDate, setFromDate] = useState('2026-07-17')
-  const [toDate, setToDate]     = useState('2026-07-23')
-  const [tenant, setTenant]     = useState('all')
-
-  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError } = useQuery({
+  const { data: batchData, isLoading: isBatchesLoading, isError: isBatchesError, error: batchesError } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  const { data: transferData, isError: isTransfersError } = useQuery({
+  const { data: transferData, isError: isTransfersError, error: transfersError } = useQuery({
     queryKey: ['transfers'],
     queryFn: fetchTransfers,
   })
 
-  const batches: MainBatch[] = isBatchesError ? mockBatches : (batchData?.data ?? [])
-  const transfers = isTransfersError ? mockTransfers : (transferData?.content ?? [])
+  const batches: MainBatch[] = batchData?.data ?? []
+  const transfers = transferData?.content ?? []
 
   const totalBatches = batches.length
   const totalTransactions = batches.reduce((sum, b) => sum + b.totalTransactions, 0)
@@ -143,36 +109,8 @@ export default function Reporting() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Reporting Dashboard</h1>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-end gap-4 flex-wrap">
-            <div className="space-y-1.5">
-              <Label htmlFor="fromDate">From Date</Label>
-              <Input id="fromDate" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="w-40" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="toDate">To Date</Label>
-              <Input id="toDate" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="w-40" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tenant-filter">Tenant</Label>
-              <Select value={tenant} onValueChange={setTenant}>
-                <SelectTrigger id="tenant-filter" className="w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tenants</SelectItem>
-                  {TENANTS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button className="bg-[#1565C0] hover:bg-[#0d47a1] text-white">
-              Apply Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {isBatchesError && <LoadError what="batches" error={batchesError} />}
+      {isTransfersError && <LoadError what="transfers" error={transfersError} />}
 
       {/* Row 1 — KPIs */}
       <div className="grid grid-cols-4 gap-4">
@@ -242,41 +180,22 @@ export default function Reporting() {
         </Card>
       </div>
 
-      {/* Row 3 — Bar charts */}
+      {/* Row 3 — not connected yet: amount by ministry, failure rate by DFSP */}
       <div className="flex gap-4">
-        {/* Amount by Ministry */}
         <Card className="flex-1 min-w-0">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-700">Amount Disbursed by Ministry ($K)</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">Amount Disbursed by Ministry</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={ministryData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="ministry" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v) => `$${v}K`} />
-                <Bar dataKey="amount" fill="#1565C0" radius={[3, 3, 0, 0]} name="Amount ($K)" />
-              </BarChart>
-            </ResponsiveContainer>
+            <NotAvailable what="This report is" />
           </CardContent>
         </Card>
-
-        {/* Failure Rate by DFSP */}
         <Card className="flex-1 min-w-0">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-gray-700">Failure Rate by DFSP (%)</CardTitle>
+            <CardTitle className="text-sm font-semibold text-gray-700">Failure Rate by DFSP</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={dfspData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="dfsp" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} unit="%" />
-                <Tooltip formatter={(v) => `${v}%`} />
-                <Bar dataKey="rate" fill="#ef4444" radius={[3, 3, 0, 0]} name="Failure Rate" />
-              </BarChart>
-            </ResponsiveContainer>
+            <NotAvailable what="This report is" />
           </CardContent>
         </Card>
       </div>
@@ -309,7 +228,7 @@ export default function Reporting() {
                 : (
                     <tr>
                       <td colSpan={4} className="text-center text-muted-foreground py-8">
-                        No failed batches.
+                        {isBatchesError ? 'No batches loaded.' : 'No failed batches.'}
                       </td>
                     </tr>
                   )

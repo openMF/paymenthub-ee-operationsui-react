@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fetchMainBatches } from '@/lib/api/paymentHub'
-import { mainBatches as mockBatches } from './mocks/mainBatches.mock'
 import type { MainBatch } from './types'
 import StatusBadge from '@/components/shared/StatusBadge'
 import {
@@ -12,7 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight, Download, FileText, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
+import LoadError from '@/components/shared/LoadError'
 import { exportCsv, csvDate } from '@/lib/exportCsv'
 import { exportPdf } from '@/lib/exportPdf'
 import { formatAmount } from '@/lib/formatAmount'
@@ -34,13 +34,12 @@ export default function MainBatchesTab() {
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(10)
 
-  const { data: apiData, isLoading, isError } = useQuery({
+  const { data: apiData, isLoading, isError, error } = useQuery({
     queryKey: ['mainBatches'],
     queryFn: fetchMainBatches,
   })
 
-  // Fall back to mock data only when the API call fails
-  const rows: MainBatch[] = isError ? mockBatches : (apiData?.data ?? [])
+  const rows: MainBatch[] = apiData?.data ?? []
   const totalCount: number = rows.length
 
   const filtered = rows.filter(
@@ -111,12 +110,7 @@ export default function MainBatchesTab() {
       </div>
 
       {/* Error banner */}
-      {isError && (
-        <div className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm text-orange-700">
-          <AlertCircle size={15} className="shrink-0" />
-          Could not reach the API — showing cached data.
-        </div>
-      )}
+      {isError && <LoadError what="batches" error={error} />}
 
       {/* Table */}
       <div className="rounded-lg border bg-white">
@@ -164,7 +158,7 @@ export default function MainBatchesTab() {
                 : (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                        No records found.
+                        {isError ? 'No batches loaded.' : 'No records found.'}
                       </TableCell>
                     </TableRow>
                   )
